@@ -1,0 +1,46 @@
+name: PR Policy
+
+on:
+  pull_request:
+    types:
+      - opened
+      - edited
+      - synchronize
+      - reopened
+
+permissions:
+  contents: read
+
+jobs:
+  validate-pr:
+    name: Validate PR
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate PR title
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        shell: bash
+        run: |
+          pattern='^(feat|fix|refactor|perf|test|docs|style|build|ci|chore)(\([a-z0-9][a-z0-9-]*\))?(!)?: .+'
+
+          if [[ ! "$PR_TITLE" =~ $pattern ]]; then
+            echo "::error::PR 제목이 Conventional Commits 형식이 아닙니다."
+            echo "::error::예: feat(metronome): 탭 템포 기능 추가"
+            echo "::error::현재 제목: $PR_TITLE"
+            exit 1
+          fi
+
+      - name: Validate branch name
+        env:
+          BRANCH_NAME: ${{ github.head_ref }}
+        shell: bash
+        run: |
+          pattern='^(feat|fix|refactor|perf|test|docs|style|build|ci|chore|hotfix)/([0-9]+-)?[a-z0-9]+(-[a-z0-9]+)*$'
+
+          if [[ ! "$BRANCH_NAME" =~ $pattern ]]; then
+            echo "::error::브랜치 이름이 정책과 일치하지 않습니다."
+            echo "::error::예: feat/42-tap-tempo 또는 fix/audio-duplicate-click"
+            echo "::error::현재 브랜치: $BRANCH_NAME"
+            exit 1
+          fi
