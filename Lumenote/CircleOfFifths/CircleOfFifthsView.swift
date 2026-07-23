@@ -5,6 +5,7 @@ import SwiftUI
 struct CircleOfFifthsView: View {
     @State private var model = CircleOfFifthsModel()
     @State private var activePicker: ActivePicker?
+    @State private var emphasisClearToken = UUID()
 
     private enum ActivePicker: Identifiable, Equatable {
         case tonic
@@ -142,10 +143,145 @@ struct CircleOfFifthsView: View {
                 }
             }
 
+            modeCharacterCard
             scaleNotesTable
         }
         // Keep selector chrome height stable so the circle never jumps when a popup opens.
         .frame(maxWidth: .infinity)
+        .onChange(of: model.selectedTonic) { _, _ in
+            model.clearEmphasis()
+        }
+        .onChange(of: model.selectedMode) { _, _ in
+            model.clearEmphasis()
+        }
+    }
+
+    private var modeCharacterCard: some View {
+        let character = model.modeCharacter
+
+        return VStack(alignment: .leading, spacing: 10) {
+            Text("Mode Character")
+                .font(.system(.caption, design: .rounded).weight(.bold))
+                .foregroundStyle(.secondary)
+
+            Text(character.summary)
+                .font(.system(.body, design: .rounded).weight(.semibold))
+                .foregroundStyle(.primary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Formula")
+                    .font(.system(.caption2, design: .rounded).weight(.semibold))
+                    .foregroundStyle(.secondary)
+
+                HStack(spacing: 2) {
+                    ForEach(Array(character.formula.enumerated()), id: \.element.id) { index, tone in
+                        if index > 0 {
+                            Text("·")
+                                .font(.system(.caption, design: .rounded).weight(.semibold))
+                                .foregroundStyle(.secondary.opacity(0.5))
+                        }
+
+                        let isLit = model.emphasizedScaleDegrees.contains(tone.scaleDegree)
+                            || (model.emphasizedScaleDegrees.isEmpty && tone.isEmphasized)
+
+                        Button {
+                            flashEmphasis(scaleDegrees: [tone.scaleDegree])
+                        } label: {
+                            Text(tone.symbol)
+                                .font(.system(.callout, design: .rounded).weight(isLit ? .bold : .semibold))
+                                .foregroundStyle(isLit ? Color.primary : Color.secondary)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 4)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                        .fill(isLit ? Color(red: 1.0, green: 0.88, blue: 0.65) : Color.clear)
+                                )
+                        }
+                        .buttonStyle(.plain)
+                        .frame(maxWidth: .infinity)
+                    }
+                }
+            }
+
+            if character.characteristicNote != nil || character.characteristicChord != nil {
+                VStack(alignment: .leading, spacing: 6) {
+                    if let note = character.characteristicNote {
+                        characteristicRow(symbol: "★", text: note.text) {
+                            flashEmphasis(
+                                scaleDegree: note.scaleDegree,
+                                clockPosition: note.clockPosition
+                            )
+                        }
+                    }
+                    if let chord = character.characteristicChord {
+                        characteristicRow(symbol: "★", text: chord.text) {
+                            flashEmphasis(
+                                scaleDegree: chord.scaleDegree,
+                                clockPosition: chord.clockPosition
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.white.opacity(0.85))
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(Color.black.opacity(0.75), lineWidth: 1.5)
+        )
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("모드 캐릭터, \(character.summary)")
+    }
+
+    private func characteristicRow(
+        symbol: String,
+        text: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(symbol)
+                    .font(.system(.subheadline, design: .rounded).weight(.bold))
+                    .foregroundStyle(Color(red: 0.85, green: 0.55, blue: 0.1))
+                Text(text)
+                    .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .multilineTextAlignment(.leading)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(Color(red: 1.0, green: 0.95, blue: 0.86))
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func flashEmphasis(scaleDegree: Int, clockPosition: Int) {
+        model.emphasize(scaleDegree: scaleDegree, clockPosition: clockPosition)
+        scheduleEmphasisClear()
+    }
+
+    private func flashEmphasis(scaleDegrees: [Int]) {
+        model.emphasize(scaleDegrees: Set(scaleDegrees))
+        scheduleEmphasisClear()
+    }
+
+    private func scheduleEmphasisClear() {
+        let token = UUID()
+        emphasisClearToken = token
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(1200))
+            guard emphasisClearToken == token else { return }
+            model.clearEmphasis()
+        }
     }
 
     private var scaleNotesTable: some View {
@@ -166,18 +302,24 @@ struct CircleOfFifthsView: View {
                             .padding(.vertical, 4)
                     }
 
+                    let isLit = model.emphasizedScaleDegrees.contains(tone.scaleDegree)
+
                     VStack(spacing: 6) {
                         Text(tone.degree)
                             .font(.system(.caption2, design: .rounded).weight(.semibold))
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(isLit ? Color.primary : .secondary)
                         Text(tone.note)
-                            .font(.system(.body, design: .rounded).weight(index == 0 ? .bold : .semibold))
+                            .font(.system(.body, design: .rounded).weight(index == 0 || isLit ? .bold : .semibold))
                             .foregroundStyle(.primary)
                             .minimumScaleFactor(0.7)
                             .lineLimit(1)
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 4)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .fill(isLit ? Color(red: 1.0, green: 0.88, blue: 0.65) : Color.clear)
+                    )
                 }
             }
             .padding(.horizontal, 10)
@@ -297,6 +439,7 @@ struct CircleOfFifthsView: View {
                     SelectionRow(
                         id: tonic.rawValue,
                         label: tonic.displayName,
+                        subtitle: nil,
                         isObscure: tonic.isObscure,
                         isSelected: model.selectedTonic == tonic
                     ) {
@@ -311,6 +454,7 @@ struct CircleOfFifthsView: View {
                     SelectionRow(
                         id: mode.rawValue,
                         label: mode.displayName,
+                        subtitle: mode.characterSummary,
                         isObscure: false,
                         isSelected: model.selectedMode == mode
                     ) {
@@ -331,9 +475,16 @@ struct CircleOfFifthsView: View {
                             row.action()
                         } label: {
                             HStack {
-                                Text(row.label)
-                                    .font(.system(.body, design: .rounded).weight(.semibold))
-                                    .foregroundStyle(.primary)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(row.label)
+                                        .font(.system(.body, design: .rounded).weight(.semibold))
+                                        .foregroundStyle(.primary)
+                                    if let subtitle = row.subtitle {
+                                        Text(subtitle)
+                                            .font(.system(.caption, design: .rounded).weight(.medium))
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
                                 Spacer(minLength: 0)
                                 if row.isSelected {
                                     Image(systemName: "checkmark")
@@ -395,6 +546,7 @@ struct CircleOfFifthsView: View {
 private struct SelectionRow: Identifiable {
     let id: String
     let label: String
+    let subtitle: String?
     let isObscure: Bool
     let isSelected: Bool
     let action: () -> Void

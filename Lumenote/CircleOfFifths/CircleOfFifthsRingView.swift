@@ -65,7 +65,10 @@ struct CircleOfFifthsRingView: View {
                         noteInnerRatio: noteInnerRatio,
                         relativeInnerRatio: relativeInnerRatio,
                         raisedScale: raisedScale,
-                        angularPadDegrees: raisedAngularPadDegrees
+                        angularPadDegrees: raisedAngularPadDegrees,
+                        isEmphasized: model.emphasizedClockPositions.contains { position in
+                            model.screenClock(forModelPosition: position) == 12
+                        }
                     )
 
                     // Rotating labels.
@@ -82,6 +85,7 @@ struct CircleOfFifthsRingView: View {
                 .frame(width: size, height: size)
             }
             .frame(width: geo.size.width, height: geo.size.height)
+            .animation(.easeInOut(duration: 0.2), value: model.emphasizedClockPositions)
             .contentShape(Circle().scale(1.12))
             .gesture(rotationDragGesture(center: gestureCenter))
             .onAppear {
@@ -177,6 +181,34 @@ struct CircleOfFifthsRingView: View {
                 lineWidth: radius == radii.degreeOuter ? 1.8 : 1.1
             )
         }
+
+        // Temporary emphasis (characteristic note / formula tap).
+        let emphasizedScreens = Set(
+            model.emphasizedClockPositions.map { model.screenClock(forModelPosition: $0) }
+        )
+        let emphasisFill = Color(red: 1.0, green: 0.82, blue: 0.28).opacity(0.42)
+        let emphasisStroke = Color(red: 0.92, green: 0.55, blue: 0.08)
+        for screenPosition in emphasizedScreens where screenPosition != 12 {
+            fillSector(
+                context: context,
+                center: center,
+                inner: radii.relativeInner,
+                outer: radii.degreeOuter,
+                clockPosition: screenPosition,
+                color: emphasisFill,
+                angularPad: 1.2
+            )
+            strokeSector(
+                context: context,
+                center: center,
+                inner: radii.relativeInner,
+                outer: radii.degreeOuter,
+                clockPosition: screenPosition,
+                color: emphasisStroke,
+                lineWidth: 2.4,
+                angularPad: 1.2
+            )
+        }
     }
 
     // MARK: - Labels
@@ -188,6 +220,7 @@ struct CircleOfFifthsRingView: View {
             let name = model.noteNames[position].map(CircleOfFifthsModel.Tonic.formatNoteName) ?? ""
             let isActive = model.activePositionSet.contains(position)
             let isTonic = position == model.tonicArrowPosition
+            let isEmphasized = model.emphasizedClockPositions.contains(position)
             let radius = isTonic ? baseRadius * raisedScale : baseRadius
             Text(name)
                 .font(.system(
@@ -197,9 +230,14 @@ struct CircleOfFifthsRingView: View {
                 ))
                 .foregroundStyle(isActive ? Color.white : Color.secondary)
                 .shadow(color: isActive ? .black.opacity(0.22) : .clear, radius: 1, y: 0.5)
+                .padding(isEmphasized ? 3 : 0)
+                .background(
+                    Circle()
+                        .fill(isEmphasized ? Color(red: 1.0, green: 0.82, blue: 0.28).opacity(0.9) : .clear)
+                )
                 .rotationEffect(.degrees(-displayedRotationDegrees))
                 .position(point(center: center, radius: radius, angle: angleForCenter(of: position)))
-                .zIndex(isTonic ? 1 : 0)
+                .zIndex(isTonic || isEmphasized ? 1 : 0)
         }
     }
 
@@ -464,6 +502,26 @@ struct CircleOfFifthsRingView: View {
         context.fill(path, with: .color(color))
     }
 
+    private func strokeSector(
+        context: GraphicsContext,
+        center: CGPoint,
+        inner: CGFloat,
+        outer: CGFloat,
+        clockPosition: Int,
+        color: Color,
+        lineWidth: CGFloat,
+        angularPad: Double
+    ) {
+        let startAngle = angleForLeadingEdge(of: clockPosition) - .degrees(angularPad)
+        let endAngle = angleForLeadingEdge(of: CircleOfFifthsModel.normalizedClock(clockPosition + 1))
+            + .degrees(angularPad)
+        var path = Path()
+        path.addArc(center: center, radius: outer, startAngle: startAngle, endAngle: endAngle, clockwise: false)
+        path.addArc(center: center, radius: inner, startAngle: endAngle, endAngle: startAngle, clockwise: true)
+        path.closeSubpath()
+        context.stroke(path, with: .color(color), lineWidth: lineWidth)
+    }
+
     // MARK: - Geometry helpers
 
     private func angleForLeadingEdge(of clockPosition: Int) -> Angle {
@@ -496,6 +554,7 @@ private struct RaisedTonicWedgeView: View {
     let relativeInnerRatio: CGFloat
     let raisedScale: CGFloat
     let angularPadDegrees: Double
+    var isEmphasized: Bool = false
 
     var body: some View {
         GeometryReader { geo in
@@ -531,6 +590,25 @@ private struct RaisedTonicWedgeView: View {
                     fill: relativeFill,
                     strokeWidth: 1.0
                 )
+
+                if isEmphasized {
+                    AnnularSector(
+                        clockPosition: 12,
+                        innerRatio: relativeInnerRatio * raisedScale,
+                        outerRatio: outerRadiusRatio * raisedScale,
+                        angularPadDegrees: angularPadDegrees
+                    )
+                    .fill(Color(red: 1.0, green: 0.82, blue: 0.28).opacity(0.42))
+                    .overlay(
+                        AnnularSector(
+                            clockPosition: 12,
+                            innerRatio: relativeInnerRatio * raisedScale,
+                            outerRatio: outerRadiusRatio * raisedScale,
+                            angularPadDegrees: angularPadDegrees
+                        )
+                        .stroke(Color(red: 0.92, green: 0.55, blue: 0.08), lineWidth: 2.4)
+                    )
+                }
             }
             .shadow(color: .black.opacity(0.1), radius: size * 0.02, x: 0, y: size * 0.012)
             .frame(width: geo.size.width, height: geo.size.height)

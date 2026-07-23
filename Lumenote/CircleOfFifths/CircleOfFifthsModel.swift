@@ -134,17 +134,24 @@ final class CircleOfFifthsModel {
     var scaleTones: [ScaleTone] {
         let names = noteNames
         let degrees = degreeLabels
-        let rows: [(pc: Int, degree: String, note: String)] = activePositions.compactMap { position in
+        let rows: [(pc: Int, position: Int, roman: String, note: String)] = activePositions.compactMap { position in
             guard let name = names[position],
-                  let degree = degrees[position],
+                  let roman = degrees[position],
                   let pc = Self.pitchClass(of: name) else {
                 return nil
             }
-            return (pc, degree, Tonic.formatNoteName(name))
+            return (pc, position, roman, Tonic.formatNoteName(name))
         }
 
         guard let tonicPC = Self.pitchClass(of: selectedTonic.rawValue) else {
-            return rows.map { ScaleTone(degree: $0.degree, note: $0.note) }
+            return rows.enumerated().map { index, row in
+                ScaleTone(
+                    scaleDegree: index + 1,
+                    degree: row.roman,
+                    note: row.note,
+                    clockPosition: row.position
+                )
+            }
         }
 
         return rows
@@ -153,7 +160,15 @@ final class CircleOfFifthsModel {
                 let r = (rhs.pc - tonicPC + 12) % 12
                 return l < r
             }
-            .map { ScaleTone(degree: $0.degree, note: $0.note) }
+            .enumerated()
+            .map { index, row in
+                ScaleTone(
+                    scaleDegree: index + 1,
+                    degree: row.roman,
+                    note: row.note,
+                    clockPosition: row.position
+                )
+            }
     }
 
     /// Scale notes in ascending order from the tonic.
@@ -161,13 +176,117 @@ final class CircleOfFifthsModel {
         scaleTones.map(\.note)
     }
 
+    /// Mode character block: one-line comparison, formula, and characteristic note/chord.
+    var modeCharacter: ModeCharacter {
+        let profile = selectedMode.characterProfile
+        let tones = scaleTones
+
+        func tone(atScaleDegree degree: Int) -> ScaleTone? {
+            tones.first { $0.scaleDegree == degree }
+        }
+
+        let characteristicNote: ModeCharacter.Highlight?
+        if let degree = profile.characteristicNoteDegree,
+           let tone = tone(atScaleDegree: degree) {
+            characteristicNote = ModeCharacter.Highlight(
+                text: "\(tone.note)  \(profile.characteristicIntervalLabel)",
+                scaleDegree: degree,
+                clockPosition: tone.clockPosition
+            )
+        } else {
+            characteristicNote = nil
+        }
+
+        let characteristicChord: ModeCharacter.Highlight?
+        if let degree = profile.characteristicChordDegree,
+           let tone = tone(atScaleDegree: degree) {
+            let quality = chordQuality(at: tone.clockPosition).map(Self.chordQualityEnglishName) ?? ""
+            let qualityPart = quality.isEmpty ? "" : " \(quality)"
+            characteristicChord = ModeCharacter.Highlight(
+                text: "\(tone.note)\(qualityPart) · \(tone.degree)",
+                scaleDegree: degree,
+                clockPosition: tone.clockPosition
+            )
+        } else {
+            characteristicChord = nil
+        }
+
+        return ModeCharacter(
+            summary: profile.summary,
+            formula: profile.formula,
+            characteristicNote: characteristicNote,
+            characteristicChord: characteristicChord
+        )
+    }
+
+    /// Model-clock positions temporarily emphasized (e.g. characteristic note tap).
+    var emphasizedClockPositions: Set<Int> = []
+    /// Scale degrees 1…7 temporarily emphasized in the Scale table / formula.
+    var emphasizedScaleDegrees: Set<Int> = []
+
+    func emphasize(scaleDegree: Int, clockPosition: Int) {
+        emphasizedScaleDegrees = [scaleDegree]
+        emphasizedClockPositions = [clockPosition]
+    }
+
+    func emphasize(scaleDegrees: Set<Int>) {
+        emphasizedScaleDegrees = scaleDegrees
+        emphasizedClockPositions = Set(
+            scaleTones
+                .filter { scaleDegrees.contains($0.scaleDegree) }
+                .map(\.clockPosition)
+        )
+    }
+
+    func clearEmphasis() {
+        emphasizedScaleDegrees = []
+        emphasizedClockPositions = []
+    }
+
+    /// Screen-clock wedge for a model-clock position when tonic is pinned at 12.
+    func screenClock(forModelPosition position: Int) -> Int {
+        Self.normalizedClock(position - tonicArrowPosition)
+    }
+
     // MARK: - Types
 
     struct ScaleTone: Identifiable, Equatable {
+        let scaleDegree: Int
         let degree: String
         let note: String
+        let clockPosition: Int
 
-        var id: String { "\(degree)-\(note)" }
+        var id: String { "\(scaleDegree)-\(degree)-\(note)" }
+    }
+
+    struct ModeCharacter: Equatable {
+        let summary: String
+        let formula: [FormulaTone]
+        let characteristicNote: Highlight?
+        let characteristicChord: Highlight?
+
+        struct FormulaTone: Identifiable, Equatable {
+            let scaleDegree: Int
+            let symbol: String
+            let isEmphasized: Bool
+
+            var id: Int { scaleDegree }
+        }
+
+        struct Highlight: Equatable {
+            let text: String
+            let scaleDegree: Int
+            let clockPosition: Int
+        }
+    }
+
+    struct ModeCharacterProfile {
+        let summary: String
+        let formula: [ModeCharacter.FormulaTone]
+        /// Nil for Ionian / Aeolian (no distinctive note beyond the parent scale).
+        let characteristicNoteDegree: Int?
+        let characteristicIntervalLabel: String
+        let characteristicChordDegree: Int?
     }
 
     enum Tonic: String, CaseIterable, Identifiable {
@@ -327,6 +446,99 @@ final class CircleOfFifthsModel {
             case .locrian: return -6
             }
         }
+
+        /// Short subtitle for the mode picker (same as Mode Character summary).
+        var characterSummary: String {
+            characterProfile.summary
+        }
+
+        var characterProfile: ModeCharacterProfile {
+            switch self {
+            case .lydian:
+                return ModeCharacterProfile(
+                    summary: "메이저 + 증4도",
+                    formula: Self.formula([
+                        (1, "1", false), (2, "2", false), (3, "3", false),
+                        (4, "♯4", true), (5, "5", false), (6, "6", false), (7, "7", false)
+                    ]),
+                    characteristicNoteDegree: 4,
+                    characteristicIntervalLabel: "Augmented 4th",
+                    characteristicChordDegree: 2
+                )
+            case .ionian:
+                return ModeCharacterProfile(
+                    summary: "일반적인 메이저",
+                    formula: Self.formula([
+                        (1, "1", false), (2, "2", false), (3, "3", false),
+                        (4, "4", false), (5, "5", false), (6, "6", false), (7, "7", false)
+                    ]),
+                    characteristicNoteDegree: nil,
+                    characteristicIntervalLabel: "",
+                    characteristicChordDegree: nil
+                )
+            case .mixolydian:
+                return ModeCharacterProfile(
+                    summary: "메이저 + 단7도",
+                    formula: Self.formula([
+                        (1, "1", false), (2, "2", false), (3, "3", false),
+                        (4, "4", false), (5, "5", false), (6, "6", false), (7, "♭7", true)
+                    ]),
+                    characteristicNoteDegree: 7,
+                    characteristicIntervalLabel: "Minor 7th",
+                    characteristicChordDegree: 7
+                )
+            case .dorian:
+                return ModeCharacterProfile(
+                    summary: "마이너 + 장6도",
+                    formula: Self.formula([
+                        (1, "1", false), (2, "2", false), (3, "♭3", true),
+                        (4, "4", false), (5, "5", false), (6, "6", true), (7, "♭7", true)
+                    ]),
+                    characteristicNoteDegree: 6,
+                    characteristicIntervalLabel: "Major 6th",
+                    characteristicChordDegree: 4
+                )
+            case .aeolian:
+                return ModeCharacterProfile(
+                    summary: "일반적인 내추럴 마이너",
+                    formula: Self.formula([
+                        (1, "1", false), (2, "2", false), (3, "♭3", false),
+                        (4, "4", false), (5, "5", false), (6, "♭6", false), (7, "♭7", false)
+                    ]),
+                    characteristicNoteDegree: nil,
+                    characteristicIntervalLabel: "",
+                    characteristicChordDegree: nil
+                )
+            case .phrygian:
+                return ModeCharacterProfile(
+                    summary: "마이너 + 단2도",
+                    formula: Self.formula([
+                        (1, "1", false), (2, "♭2", true), (3, "♭3", true),
+                        (4, "4", false), (5, "5", false), (6, "♭6", true), (7, "♭7", true)
+                    ]),
+                    characteristicNoteDegree: 2,
+                    characteristicIntervalLabel: "Minor 2nd",
+                    characteristicChordDegree: 2
+                )
+            case .locrian:
+                return ModeCharacterProfile(
+                    summary: "마이너 + 감5도",
+                    formula: Self.formula([
+                        (1, "1", false), (2, "♭2", true), (3, "♭3", true),
+                        (4, "4", false), (5, "♭5", true), (6, "♭6", true), (7, "♭7", true)
+                    ]),
+                    characteristicNoteDegree: 5,
+                    characteristicIntervalLabel: "Diminished 5th",
+                    characteristicChordDegree: 5
+                )
+            }
+        }
+
+        private static func formula(
+            _ degrees: [(Int, String, Bool)]
+        ) -> [ModeCharacter.FormulaTone] {
+            degrees.map { ModeCharacter.FormulaTone(scaleDegree: $0.0, symbol: $0.1, isEmphasized: $0.2) }
+        }
     }
 
     enum ChordQuality {
@@ -340,6 +552,14 @@ final class CircleOfFifthsModel {
             case 3, 4, 5: return .minor
             default: return .diminished
             }
+        }
+    }
+
+    private static func chordQualityEnglishName(_ quality: ChordQuality) -> String {
+        switch quality {
+        case .major: return "Major"
+        case .minor: return "Minor"
+        case .diminished: return "Dim"
         }
     }
 
