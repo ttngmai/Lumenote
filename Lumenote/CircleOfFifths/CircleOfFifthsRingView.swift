@@ -27,50 +27,63 @@ struct CircleOfFifthsRingView: View {
     /// How much the 12 o'clock tonic wedge is scaled up (radial + slight angular overlap).
     private let raisedScale: CGFloat = 1.05
     private let raisedAngularPadDegrees: Double = 2.5
+    /// Extra vertical room (as a fraction of ring size) for raised tonic + “완전4/5도” labels.
+    /// Keeps ring diameter unchanged while preventing ScrollView from clipping overflow.
+    private let verticalLabelMarginRatio: CGFloat = 0.08
 
     /// Continuous ring rotation. Avoids C (0°) ↔ F (−330°) long-way animation.
     private var displayedRotationDegrees: Double {
         ringRotationDegrees + dragRotationDegrees
     }
 
+    /// Layout is slightly taller than wide so labels above/below the ring aren't clipped.
+    private var layoutAspectRatio: CGFloat {
+        1 / (1 + verticalLabelMarginRatio * 2)
+    }
+
     var body: some View {
         GeometryReader { geo in
-            let size = min(geo.size.width, geo.size.height)
-            let center = CGPoint(x: geo.size.width / 2, y: geo.size.height / 2)
+            // Use width as the ring size (same diameter as the old 1:1 square layout).
+            let size = geo.size.width
+            let localCenter = CGPoint(x: size / 2, y: size / 2)
+            let gestureCenter = CGPoint(x: geo.size.width / 2, y: geo.size.height / 2)
 
             ZStack {
-                // Base rings (equal wedges).
-                Canvas { context, _ in
-                    drawBaseRings(context: context, center: center, size: size)
-                }
-
-                // Raised 12 o'clock wedge drawn above neighbors with a drop shadow.
-                RaisedTonicWedgeView(
-                    noteColor: noteColor(forScreenClock: 12),
-                    relativeFill: relativeFill,
-                    ringStroke: ringStroke,
-                    outerRadiusRatio: outerRadiusRatio,
-                    noteOuterRatio: noteOuterRatio,
-                    noteInnerRatio: noteInnerRatio,
-                    relativeInnerRatio: relativeInnerRatio,
-                    raisedScale: raisedScale,
-                    angularPadDegrees: raisedAngularPadDegrees
-                )
-
-                // Rotating labels.
                 ZStack {
-                    noteLabels(center: center, size: size)
-                    relativeMinorLabels(center: center, size: size)
-                    degreeLabels(center: center, size: size)
-                }
-                .rotationEffect(.degrees(displayedRotationDegrees))
+                    // Base rings (equal wedges).
+                    Canvas { context, _ in
+                        drawBaseRings(context: context, center: localCenter, size: size)
+                    }
 
-                centerHub(size: size)
-                rotationAffordances(center: center, size: size)
+                    // Raised 12 o'clock wedge drawn above neighbors with a drop shadow.
+                    RaisedTonicWedgeView(
+                        noteColor: noteColor(forScreenClock: 12),
+                        relativeFill: relativeFill,
+                        ringStroke: ringStroke,
+                        outerRadiusRatio: outerRadiusRatio,
+                        noteOuterRatio: noteOuterRatio,
+                        noteInnerRatio: noteInnerRatio,
+                        relativeInnerRatio: relativeInnerRatio,
+                        raisedScale: raisedScale,
+                        angularPadDegrees: raisedAngularPadDegrees
+                    )
+
+                    // Rotating labels.
+                    ZStack {
+                        noteLabels(center: localCenter, size: size)
+                        relativeMinorLabels(center: localCenter, size: size)
+                        degreeLabels(center: localCenter, size: size)
+                    }
+                    .rotationEffect(.degrees(displayedRotationDegrees))
+
+                    centerHub(size: size)
+                    rotationAffordances(center: localCenter, size: size)
+                }
+                .frame(width: size, height: size)
             }
             .frame(width: geo.size.width, height: geo.size.height)
             .contentShape(Circle().scale(1.12))
-            .gesture(rotationDragGesture(center: center))
+            .gesture(rotationDragGesture(center: gestureCenter))
             .onAppear {
                 ringRotationDegrees = canonicalRotationDegrees(for: model.tonicArrowPosition)
             }
@@ -91,7 +104,7 @@ struct CircleOfFifthsRingView: View {
                 value: model.selectedMode
             )
         }
-        .aspectRatio(1, contentMode: .fit)
+        .aspectRatio(layoutAspectRatio, contentMode: .fit)
         .accessibilityHint("원을 드래그하여 토닉을 변경합니다. 시계 방향은 완전5도, 반시계 방향은 완전4도입니다.")
     }
 

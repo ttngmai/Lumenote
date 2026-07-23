@@ -33,13 +33,17 @@ struct CircleOfFifthsView: View {
                 if isWide {
                     HStack(alignment: .top, spacing: 20) {
                         circleSection
-                        selectors(stacked: true)
-                            .frame(width: min(280, geo.size.width * 0.32))
+                        ScrollView {
+                            selectors(stacked: true)
+                        }
+                        .frame(width: min(280, geo.size.width * 0.32))
                     }
                 } else {
-                    VStack(spacing: 16) {
-                        circleSection
-                        selectors(stacked: false)
+                    ScrollView {
+                        VStack(spacing: 16) {
+                            circleSection
+                            selectors(stacked: false)
+                        }
                     }
                 }
             }
@@ -122,21 +126,72 @@ struct CircleOfFifthsView: View {
         }
 
         // Landscape: one selector per row. Portrait: side by side.
-        Group {
-            if stacked {
-                VStack(spacing: 12) {
-                    tonicButton
-                    modeButton
-                }
-            } else {
-                HStack(spacing: 12) {
-                    tonicButton
-                    modeButton
+        // Scale table sits under Tonic / Mode in both layouts.
+        VStack(spacing: 12) {
+            Group {
+                if stacked {
+                    VStack(spacing: 12) {
+                        tonicButton
+                        modeButton
+                    }
+                } else {
+                    HStack(spacing: 12) {
+                        tonicButton
+                        modeButton
+                    }
                 }
             }
+
+            scaleNotesTable
         }
         // Keep selector chrome height stable so the circle never jumps when a popup opens.
         .frame(maxWidth: .infinity)
+    }
+
+    private var scaleNotesTable: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Scale")
+                .font(.system(.caption, design: .rounded).weight(.bold))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 14)
+                .padding(.top, 12)
+                .padding(.bottom, 10)
+
+            HStack(spacing: 0) {
+                ForEach(Array(model.scaleTones.enumerated()), id: \.element.id) { index, tone in
+                    if index > 0 {
+                        Rectangle()
+                            .fill(Color.black.opacity(0.08))
+                            .frame(width: 1)
+                            .padding(.vertical, 4)
+                    }
+
+                    VStack(spacing: 6) {
+                        Text(tone.degree)
+                            .font(.system(.caption2, design: .rounded).weight(.semibold))
+                            .foregroundStyle(.secondary)
+                        Text(tone.note)
+                            .font(.system(.body, design: .rounded).weight(index == 0 ? .bold : .semibold))
+                            .foregroundStyle(.primary)
+                            .minimumScaleFactor(0.7)
+                            .lineLimit(1)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 4)
+                }
+            }
+            .padding(.horizontal, 10)
+            .padding(.bottom, 12)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.white.opacity(0.85))
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(Color.black.opacity(0.75), lineWidth: 1.5)
+        )
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("스케일 구성음")
     }
 
     private func pickerButton(
