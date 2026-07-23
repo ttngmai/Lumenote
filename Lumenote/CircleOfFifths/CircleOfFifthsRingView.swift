@@ -5,6 +5,7 @@ import SwiftUI
 struct CircleOfFifthsRingView: View {
     @Bindable var model: CircleOfFifthsModel
 
+    @State private var ringRotationDegrees: Double = 0
     @State private var dragRotationDegrees: Double = 0
     @State private var dragStartAngle: Double?
     @State private var rotationAtDragStart: Double = 0
@@ -23,8 +24,9 @@ struct CircleOfFifthsRingView: View {
     private let raisedScale: CGFloat = 1.05
     private let raisedAngularPadDegrees: Double = 2.5
 
+    /// Continuous ring rotation. Avoids C (0°) ↔ F (−330°) long-way animation.
     private var displayedRotationDegrees: Double {
-        model.tonicAlignmentRotationDegrees + dragRotationDegrees
+        ringRotationDegrees + dragRotationDegrees
     }
 
     var body: some View {
@@ -63,12 +65,19 @@ struct CircleOfFifthsRingView: View {
             .frame(width: geo.size.width, height: geo.size.height)
             .contentShape(Circle().scale(1.12))
             .gesture(rotationDragGesture(center: center))
-            .animation(
-                dragStartAngle == nil
-                    ? .spring(response: 0.45, dampingFraction: 0.82)
-                    : nil,
-                value: model.selectedTonic
-            )
+            .onAppear {
+                ringRotationDegrees = canonicalRotationDegrees(for: model.tonicArrowPosition)
+            }
+            .onChange(of: model.selectedTonic) { _, _ in
+                // Picker / external tonic changes: take the shortest arc (fixes C ↔ F spin).
+                guard dragStartAngle == nil else { return }
+                withAnimation(.spring(response: 0.45, dampingFraction: 0.82)) {
+                    ringRotationDegrees += shortestRotationDelta(
+                        from: ringRotationDegrees,
+                        to: canonicalRotationDegrees(for: model.tonicArrowPosition)
+                    )
+                }
+            }
             .animation(
                 dragStartAngle == nil
                     ? .spring(response: 0.45, dampingFraction: 0.82)
@@ -341,7 +350,14 @@ struct CircleOfFifthsRingView: View {
                 let newDisplayed = rotationAtDragStart + delta
                 let position = CircleOfFifthsModel.lydianStartPosition(forRotationDegrees: newDisplayed)
                 model.selectTonic(forLydianStart: position)
-                dragRotationDegrees = newDisplayed - model.tonicAlignmentRotationDegrees
+
+                // Keep ringRotation on a continuous snapped angle so C↔F never jumps by 330°.
+                let snappedRing = ringRotationDegrees + shortestRotationDelta(
+                    from: ringRotationDegrees,
+                    to: canonicalRotationDegrees(for: position)
+                )
+                ringRotationDegrees = snappedRing
+                dragRotationDegrees = newDisplayed - snappedRing
             }
             .onEnded { _ in
                 withAnimation(.spring(response: 0.35, dampingFraction: 0.84)) {
@@ -349,6 +365,27 @@ struct CircleOfFifthsRingView: View {
                 }
                 dragStartAngle = nil
             }
+    }
+
+    /// Canonical alignment for a clock position in (−360, 0] (C/B♯ → 0, G → −30, …, F → −330).
+    private func canonicalRotationDegrees(for lydianStartPosition: Int) -> Double {
+        -Double(lydianStartPosition % 12) * 30.0
+    }
+
+    /// Shortest signed delta on the circle from `from` toward an angle equivalent to `to`.
+    private func shortestRotationDelta(from: Double, to: Double) -> Double {
+        let fromN = normalizedDegrees(from)
+        let toN = normalizedDegrees(to)
+        var delta = toN - fromN
+        if delta > 180 { delta -= 360 }
+        if delta <= -180 { delta += 360 }
+        return delta
+    }
+
+    private func normalizedDegrees(_ degrees: Double) -> Double {
+        var value = degrees.truncatingRemainder(dividingBy: 360)
+        if value < 0 { value += 360 }
+        return value
     }
 
     // MARK: - Drawing helpers
