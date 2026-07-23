@@ -56,10 +56,34 @@ final class CircleOfFifthsModel {
         Self.normalizedClock(selectedTonic.lydianStartPosition + selectedMode.offset)
     }
 
-    /// Chord quality for an active clock position, if any.
+    /// Chord quality for an active model clock position, if any.
     func chordQuality(at position: Int) -> ChordQuality? {
         guard let ordinal = activePositions.firstIndex(of: position) else { return nil }
         return ChordQuality.quality(forOrdinal: ordinal)
+    }
+
+    /// Chord quality for a fixed screen clock wedge when the tonic is pinned at 12 o'clock.
+    /// Screen position 12 is the tonic; qualities depend only on the selected mode.
+    func screenChordQuality(atScreenClock position: Int) -> ChordQuality? {
+        let stepsFromTonic = position % 12 // 12 → 0, 1 → 1, …
+        for ordinal in 0..<7 {
+            let steps = Self.normalizedClock(12 + selectedMode.offset + ordinal) % 12
+            if steps == stepsFromTonic {
+                return ChordQuality.quality(forOrdinal: ordinal)
+            }
+        }
+        return nil
+    }
+
+    /// Relative-minor tonic spelling for the major key whose tonic is at `position`.
+    var relativeMinorNames: [Int: String] {
+        var result: [Int: String] = [:]
+        for position in 1...12 {
+            guard let major = noteNames[position],
+                  let relative = Self.relativeMinor(ofMajor: major) else { continue }
+            result[position] = relative
+        }
+        return result
     }
 
     /// Rotation (degrees) that brings the selected tonic to 12 o'clock.
@@ -378,5 +402,30 @@ final class CircleOfFifthsModel {
             pc -= 1
         }
         return (pc % 12 + 12) % 12
+    }
+
+    /// Relative minor tonic of a major tonic note (minor 3rd below), with matching spelling.
+    private static func relativeMinor(ofMajor name: String) -> String? {
+        guard let majorPC = pitchClass(of: name), let first = name.first else { return nil }
+        let letters: [Character] = ["C", "D", "E", "F", "G", "A", "B"]
+        guard let letterIndex = letters.firstIndex(of: first) else { return nil }
+
+        let minorLetter = letters[(letterIndex + 5) % 7] // two letters down
+        let targetPC = (majorPC - 3 + 12) % 12
+        let basePC = pitchClass(of: String(minorLetter)) ?? 0
+        var accidental = targetPC - basePC
+        if accidental > 6 { accidental -= 12 }
+        if accidental < -6 { accidental += 12 }
+
+        let suffix: String
+        switch accidental {
+        case 2: suffix = "##"
+        case 1: suffix = "#"
+        case 0: suffix = ""
+        case -1: suffix = "b"
+        case -2: suffix = "bb"
+        default: return nil
+        }
+        return String(minorLetter) + suffix
     }
 }

@@ -78,6 +78,11 @@ struct CircleOfFifthsView: View {
                 .frame(maxWidth: 520)
                 .padding(.horizontal, 4)
 
+            Text("바깥 음이름 · 안쪽 관계단조 · 시계=완전5도 · 반시계=완전4도")
+                .font(.system(.caption2, design: .rounded))
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+
             legend
         }
     }

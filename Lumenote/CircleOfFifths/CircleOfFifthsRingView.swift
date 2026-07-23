@@ -13,7 +13,12 @@ struct CircleOfFifthsRingView: View {
     private let minorColor = Color(red: 0x4F / 255, green: 0x81 / 255, blue: 0xEE / 255)
     private let diminishedColor = Color(red: 0x9A / 255, green: 0x64 / 255, blue: 0xDB / 255)
     private let chromaticFill = Color(red: 0.86, green: 0.86, blue: 0.86)
+    private let relativeFill = Color(red: 0.94, green: 0.94, blue: 0.95)
+    private let degreeFill = Color(red: 0.96, green: 0.96, blue: 0.94)
     private let ringStroke = Color(red: 0.15, green: 0.15, blue: 0.15)
+
+    /// Outer radius of the note (major) ring, used by the fixed tonic pointer.
+    private let outerRadiusRatio: CGFloat = 0.48
 
     private var displayedRotationDegrees: Double {
         model.tonicAlignmentRotationDegrees + dragRotationDegrees
@@ -25,22 +30,26 @@ struct CircleOfFifthsRingView: View {
             let center = CGPoint(x: geo.size.width / 2, y: geo.size.height / 2)
 
             ZStack {
-                ZStack {
-                    Canvas { context, _ in
-                        drawRings(context: context, center: center, size: size)
-                    }
+                // Fixed layer: quality colors and ring chrome stay pinned to the screen.
+                Canvas { context, _ in
+                    drawFixedRings(context: context, center: center, size: size)
+                }
 
+                // Rotating layer: note / relative / degree labels orbit with the tonic.
+                ZStack {
                     noteLabels(center: center, size: size)
+                    relativeMinorLabels(center: center, size: size)
                     degreeLabels(center: center, size: size)
-                    centerHub(size: size)
                 }
                 .rotationEffect(.degrees(displayedRotationDegrees))
-                .gesture(rotationDragGesture(center: center))
 
+                centerHub(size: size)
                 fixedTonicPointer(center: center, size: size)
                 rotationAffordances(center: center, size: size)
             }
             .frame(width: geo.size.width, height: geo.size.height)
+            .contentShape(Circle().scale(1.08))
+            .gesture(rotationDragGesture(center: center))
             .animation(
                 dragStartAngle == nil
                     ? .spring(response: 0.45, dampingFraction: 0.82)
@@ -55,21 +64,23 @@ struct CircleOfFifthsRingView: View {
             )
         }
         .aspectRatio(1, contentMode: .fit)
-        .accessibilityHint("원을 드래그하여 토닉을 변경합니다.")
+        .accessibilityHint("원을 드래그하여 토닉을 변경합니다. 시계 방향은 완전5도, 반시계 방향은 완전4도입니다.")
     }
 
-    // MARK: - Drawing
+    // MARK: - Fixed ring drawing
 
-    private func drawRings(context: GraphicsContext, center: CGPoint, size: CGFloat) {
-        let noteOuter = size * 0.48
-        let noteInner = size * 0.30
-        let degreeOuter = noteInner
-        let degreeInner = size * 0.16
+    private func drawFixedRings(context: GraphicsContext, center: CGPoint, size: CGFloat) {
+        let noteOuter = size * outerRadiusRatio
+        let noteInner = size * 0.385
+        let relativeOuter = noteInner
+        let relativeInner = size * 0.295
+        let degreeOuter = relativeInner
+        let degreeInner = size * 0.175
 
-        // Note ring wedges — diatonic sectors tinted by chord quality.
+        // Note ring — screen-fixed Major / Minor / Dim / chromatic wedges.
         for position in 1...12 {
             let color: Color
-            if let quality = model.chordQuality(at: position) {
+            if let quality = model.screenChordQuality(atScreenClock: position) {
                 switch quality {
                 case .major: color = majorColor
                 case .minor: color = minorColor
@@ -88,6 +99,18 @@ struct CircleOfFifthsRingView: View {
             )
         }
 
+        // Relative-key ring background
+        for position in 1...12 {
+            fillSector(
+                context: context,
+                center: center,
+                inner: relativeInner,
+                outer: relativeOuter,
+                clockPosition: position,
+                color: relativeFill
+            )
+        }
+
         // Degree ring background
         var degreeRing = Path()
         degreeRing.addArc(
@@ -99,21 +122,21 @@ struct CircleOfFifthsRingView: View {
         )
         context.stroke(
             degreeRing,
-            with: .color(Color(red: 0.96, green: 0.96, blue: 0.94)),
+            with: .color(degreeFill),
             style: StrokeStyle(lineWidth: degreeOuter - degreeInner)
         )
 
-        // Separators for all 12 wedges
+        // Separators
         for position in 1...12 {
             let angle = angleForLeadingEdge(of: position)
             var line = Path()
             line.move(to: point(center: center, radius: degreeInner, angle: angle))
             line.addLine(to: point(center: center, radius: noteOuter, angle: angle))
-            context.stroke(line, with: .color(ringStroke.opacity(0.35)), lineWidth: 1)
+            context.stroke(line, with: .color(ringStroke.opacity(0.3)), lineWidth: 0.8)
         }
 
-        // Ring outlines
-        for radius in [noteOuter, noteInner, degreeInner] {
+        // Ring outlines (thinner)
+        for radius in [noteOuter, noteInner, relativeInner, degreeInner] {
             var circle = Path()
             circle.addEllipse(
                 in: CGRect(
@@ -126,7 +149,7 @@ struct CircleOfFifthsRingView: View {
             context.stroke(
                 circle,
                 with: .color(ringStroke),
-                lineWidth: radius == noteOuter ? 2.5 : 1.5
+                lineWidth: radius == noteOuter ? 1.8 : 1.1
             )
         }
     }
@@ -148,28 +171,43 @@ struct CircleOfFifthsRingView: View {
         context.fill(path, with: .color(color))
     }
 
-    // MARK: - Labels
+    // MARK: - Rotating labels
 
     private func noteLabels(center: CGPoint, size: CGFloat) -> some View {
-        let radius = size * 0.39
+        let radius = size * 0.432
         return ForEach(1...12, id: \.self) { position in
             let name = model.noteNames[position].map(CircleOfFifthsModel.Tonic.formatNoteName) ?? ""
             let isActive = model.activePositionSet.contains(position)
             Text(name)
-                .font(.system(size: size * 0.055, weight: .heavy, design: .rounded))
+                .font(.system(size: size * 0.048, weight: .heavy, design: .rounded))
                 .foregroundStyle(isActive ? Color.white : Color.secondary)
-                .shadow(color: isActive ? .black.opacity(0.25) : .clear, radius: 1, y: 0.5)
+                .shadow(color: isActive ? .black.opacity(0.22) : .clear, radius: 1, y: 0.5)
+                .rotationEffect(.degrees(-displayedRotationDegrees))
+                .position(point(center: center, radius: radius, angle: angleForCenter(of: position)))
+        }
+    }
+
+    private func relativeMinorLabels(center: CGPoint, size: CGFloat) -> some View {
+        let radius = size * 0.34
+        let names = model.relativeMinorNames
+        return ForEach(1...12, id: \.self) { position in
+            let raw = names[position] ?? ""
+            let label = CircleOfFifthsModel.Tonic.formatNoteName(raw) + "m"
+            let isActive = model.activePositionSet.contains(position)
+            Text(label)
+                .font(.system(size: size * 0.028, weight: .bold, design: .rounded))
+                .foregroundStyle(isActive ? Color.primary.opacity(0.85) : Color.secondary.opacity(0.55))
                 .rotationEffect(.degrees(-displayedRotationDegrees))
                 .position(point(center: center, radius: radius, angle: angleForCenter(of: position)))
         }
     }
 
     private func degreeLabels(center: CGPoint, size: CGFloat) -> some View {
-        let radius = size * 0.23
+        let radius = size * 0.235
         return ForEach(Array(model.degreeLabels.keys.sorted()), id: \.self) { position in
             if let label = model.degreeLabels[position] {
                 Text(label)
-                    .font(.system(size: size * 0.04, weight: .bold, design: .rounded))
+                    .font(.system(size: size * 0.036, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.primary)
                     .rotationEffect(.degrees(-displayedRotationDegrees))
                     .position(point(center: center, radius: radius, angle: angleForCenter(of: position)))
@@ -180,56 +218,114 @@ struct CircleOfFifthsRingView: View {
     private func centerHub(size: CGFloat) -> some View {
         VStack(spacing: 2) {
             Text(model.selectedTonic.displayName)
-                .font(.system(size: size * 0.07, weight: .heavy, design: .rounded))
+                .font(.system(size: size * 0.065, weight: .heavy, design: .rounded))
             Text(model.selectedMode.shortName)
-                .font(.system(size: size * 0.032, weight: .semibold, design: .rounded))
+                .font(.system(size: size * 0.03, weight: .semibold, design: .rounded))
                 .foregroundStyle(.secondary)
         }
-        .rotationEffect(.degrees(-displayedRotationDegrees))
     }
 
-    /// Fixed pointer at 12 o'clock on the circle boundary (does not rotate with the ring).
+    /// Fixed pointer at 12 o'clock on the circle boundary.
     private func fixedTonicPointer(center: CGPoint, size: CGFloat) -> some View {
-        let tip = CGPoint(x: center.x, y: center.y - size * 0.48)
+        let tip = CGPoint(x: center.x, y: center.y - size * outerRadiusRatio)
         return Image(systemName: "arrowtriangle.down.fill")
-            .font(.system(size: size * 0.055))
+            .font(.system(size: size * 0.05))
             .foregroundStyle(Color.primary)
             .shadow(color: .black.opacity(0.2), radius: 1, y: 1)
             .position(tip)
             .accessibilityLabel("토닉 포인터")
     }
 
-    /// Visual cue that the circle can be rotated.
+    // MARK: - Rotation affordances
+
+    /// Curved arrows whose tips follow the arc direction, with P5 / P4 labels.
     private func rotationAffordances(center: CGPoint, size: CGFloat) -> some View {
-        let radius = size * 0.52
+        let radius = size * 0.535
         return ZStack {
-            Image(systemName: "chevron.left")
-                .font(.system(size: size * 0.035, weight: .bold, design: .rounded))
+            // Clockwise arc (right) → perfect fifths
+            directionalArc(
+                center: center,
+                radius: radius,
+                startDegrees: -72,
+                endDegrees: -28,
+                clockwise: true,
+                lineWidth: size * 0.006
+            )
+            arrowHead(
+                center: center,
+                radius: radius,
+                tangentDegrees: -28,
+                pointingClockwise: true,
+                size: size * 0.028
+            )
+            Text("완전5도")
+                .font(.system(size: size * 0.026, weight: .bold, design: .rounded))
                 .foregroundStyle(.secondary)
-                .position(point(center: center, radius: radius, angle: .degrees(-125)))
+                .position(point(center: center, radius: radius + size * 0.04, angle: .degrees(-50)))
 
-            Image(systemName: "chevron.right")
-                .font(.system(size: size * 0.035, weight: .bold, design: .rounded))
+            // Counter-clockwise arc (left) → perfect fourths
+            directionalArc(
+                center: center,
+                radius: radius,
+                startDegrees: -108,
+                endDegrees: -152,
+                clockwise: false,
+                lineWidth: size * 0.006
+            )
+            arrowHead(
+                center: center,
+                radius: radius,
+                tangentDegrees: -152,
+                pointingClockwise: false,
+                size: size * 0.028
+            )
+            Text("완전4도")
+                .font(.system(size: size * 0.026, weight: .bold, design: .rounded))
                 .foregroundStyle(.secondary)
-                .position(point(center: center, radius: radius, angle: .degrees(-55)))
-
-            // Curved hint arcs near 12 o'clock.
-            Circle()
-                .trim(from: 0.88, to: 0.97)
-                .stroke(Color.secondary.opacity(0.45), style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
-                .frame(width: radius * 2, height: radius * 2)
-                .rotationEffect(.degrees(-90))
-                .position(center)
-
-            Circle()
-                .trim(from: 0.03, to: 0.12)
-                .stroke(Color.secondary.opacity(0.45), style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
-                .frame(width: radius * 2, height: radius * 2)
-                .rotationEffect(.degrees(-90))
-                .position(center)
+                .position(point(center: center, radius: radius + size * 0.04, angle: .degrees(-130)))
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
+    }
+
+    private func directionalArc(
+        center: CGPoint,
+        radius: CGFloat,
+        startDegrees: Double,
+        endDegrees: Double,
+        clockwise: Bool,
+        lineWidth: CGFloat
+    ) -> some View {
+        Path { path in
+            path.addArc(
+                center: center,
+                radius: radius,
+                startAngle: .degrees(startDegrees),
+                endAngle: .degrees(endDegrees),
+                clockwise: clockwise
+            )
+        }
+        .stroke(Color.secondary.opacity(0.55), style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+    }
+
+    /// Triangle tip aligned with the arc tangent at `tangentDegrees`.
+    private func arrowHead(
+        center: CGPoint,
+        radius: CGFloat,
+        tangentDegrees: Double,
+        pointingClockwise: Bool,
+        size: CGFloat
+    ) -> some View {
+        // Tangent for a circle: angle of radius + 90° (CW) or −90° (CCW).
+        let tipAngle = Angle.degrees(tangentDegrees)
+        let tip = point(center: center, radius: radius, angle: tipAngle)
+        let rotation = tangentDegrees + (pointingClockwise ? 90 : -90)
+
+        return Image(systemName: "arrowtriangle.right.fill")
+            .font(.system(size: size, weight: .bold))
+            .foregroundStyle(Color.secondary.opacity(0.75))
+            .rotationEffect(.degrees(rotation))
+            .position(tip)
     }
 
     // MARK: - Drag rotation
@@ -248,7 +344,6 @@ struct CircleOfFifthsRingView: View {
                 guard let start = dragStartAngle else { return }
 
                 var delta = (angle - start) * 180 / .pi
-                // Keep delta continuous across the ±π wrap.
                 while delta > 180 { delta -= 360 }
                 while delta < -180 { delta += 360 }
 
@@ -267,11 +362,7 @@ struct CircleOfFifthsRingView: View {
 
     // MARK: - Geometry helpers
 
-    /// Leading edge angle for a clock wedge (clockwise from 12 o'clock).
-    /// Position 12 is at top; position 1 is one step clockwise.
     private func angleForLeadingEdge(of clockPosition: Int) -> Angle {
-        // Center of position N is at N * 30°, so leading edge is at (N - 0.5) * 30°.
-        // In SwiftUI, 0° is right (3 o'clock), so convert from clock degrees.
         let clockDegrees = Double(clockPosition) * 30.0 - 15.0
         return .degrees(clockDegrees - 90)
     }
