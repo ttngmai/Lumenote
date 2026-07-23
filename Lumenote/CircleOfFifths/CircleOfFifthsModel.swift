@@ -130,30 +130,45 @@ final class CircleOfFifthsModel {
         "\(selectedTonic.displayName) \(selectedMode.shortName)"
     }
 
-    /// Scale notes in ascending order from the tonic.
-    var diatonicScaleNotes: [String] {
+    /// Scale tones (degree + note) in ascending order from the tonic.
+    var scaleTones: [ScaleTone] {
         let names = noteNames
-        let pitchClasses: [(pc: Int, name: String)] = activePositionSet.compactMap { position in
-            guard let name = names[position], let pc = Self.pitchClass(of: name) else {
+        let degrees = degreeLabels
+        let rows: [(pc: Int, degree: String, note: String)] = activePositions.compactMap { position in
+            guard let name = names[position],
+                  let degree = degrees[position],
+                  let pc = Self.pitchClass(of: name) else {
                 return nil
             }
-            return (pc, name)
+            return (pc, degree, Tonic.formatNoteName(name))
         }
 
         guard let tonicPC = Self.pitchClass(of: selectedTonic.rawValue) else {
-            return pitchClasses.map { Tonic.formatNoteName($0.name) }
+            return rows.map { ScaleTone(degree: $0.degree, note: $0.note) }
         }
 
-        return pitchClasses
+        return rows
             .sorted { lhs, rhs in
                 let l = (lhs.pc - tonicPC + 12) % 12
                 let r = (rhs.pc - tonicPC + 12) % 12
                 return l < r
             }
-            .map { Tonic.formatNoteName($0.name) }
+            .map { ScaleTone(degree: $0.degree, note: $0.note) }
+    }
+
+    /// Scale notes in ascending order from the tonic.
+    var diatonicScaleNotes: [String] {
+        scaleTones.map(\.note)
     }
 
     // MARK: - Types
+
+    struct ScaleTone: Identifiable, Equatable {
+        let degree: String
+        let note: String
+
+        var id: String { "\(degree)-\(note)" }
+    }
 
     enum Tonic: String, CaseIterable, Identifiable {
         case bSharp = "B#"
