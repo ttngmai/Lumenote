@@ -46,14 +46,45 @@ final class CircleOfFifthsModel {
         return result
     }
 
-    /// Clock position of the tonic arrow.
+    /// Clock position of the tonic (aligned to the fixed 12 o'clock pointer after rotation).
     var tonicArrowPosition: Int {
         selectedTonic.lydianStartPosition
     }
 
-    /// Where the Major/Minor/Dim chord-ring segment begins.
+    /// Where the Major/Minor/Dim quality segment begins on the active arc.
     var chordRingStartPosition: Int {
         Self.normalizedClock(selectedTonic.lydianStartPosition + selectedMode.offset)
+    }
+
+    /// Chord quality for an active clock position, if any.
+    func chordQuality(at position: Int) -> ChordQuality? {
+        guard let ordinal = activePositions.firstIndex(of: position) else { return nil }
+        return ChordQuality.quality(forOrdinal: ordinal)
+    }
+
+    /// Rotation (degrees) that brings the selected tonic to 12 o'clock.
+    var tonicAlignmentRotationDegrees: Double {
+        -Double(tonicArrowPosition % 12) * 30.0
+    }
+
+    /// Select the tonic whose Lydian start matches `position`, preferring the current
+    /// enharmonic spelling when possible, otherwise a non-obscure spelling.
+    func selectTonic(forLydianStart position: Int) {
+        let normalized = Self.normalizedClock(position)
+        let matches = Tonic.allCases.filter { $0.lydianStartPosition == normalized }
+        if matches.contains(selectedTonic) { return }
+        if let preferred = matches.first(where: { !$0.isObscure }) {
+            selectedTonic = preferred
+        } else if let first = matches.first {
+            selectedTonic = first
+        }
+    }
+
+    /// Clock position implied by a circle rotation in degrees.
+    static func lydianStartPosition(forRotationDegrees degrees: Double) -> Int {
+        var steps = Int(((-degrees / 30.0).rounded())) % 12
+        if steps < 0 { steps += 12 }
+        return steps == 0 ? 12 : steps
     }
 
     var keySignatureIndex: Int {
