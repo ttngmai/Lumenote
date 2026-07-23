@@ -238,51 +238,51 @@ struct CircleOfFifthsRingView: View {
 
     // MARK: - Rotation affordances
 
-    /// Curved arrows whose tips follow the arc direction, with P5 / P4 labels.
+    /// Short curved arrows near 12 o'clock whose tips follow the arc direction.
     private func rotationAffordances(center: CGPoint, size: CGFloat) -> some View {
-        let radius = size * 0.535
+        let radius = size * 0.52
         return ZStack {
-            // Clockwise arc (right) → perfect fifths
+            // Clockwise hint (right of pointer) → perfect fifths
             directionalArc(
                 center: center,
                 radius: radius,
-                startDegrees: -72,
-                endDegrees: -28,
+                startDegrees: -78,
+                endDegrees: -58,
                 clockwise: true,
-                lineWidth: size * 0.006
+                lineWidth: size * 0.0055
             )
             arrowHead(
                 center: center,
                 radius: radius,
-                tangentDegrees: -28,
+                tangentDegrees: -58,
                 pointingClockwise: true,
-                size: size * 0.028
+                size: size * 0.024
             )
             Text("완전5도")
-                .font(.system(size: size * 0.026, weight: .bold, design: .rounded))
+                .font(.system(size: size * 0.024, weight: .bold, design: .rounded))
                 .foregroundStyle(.secondary)
-                .position(point(center: center, radius: radius + size * 0.04, angle: .degrees(-50)))
+                .position(point(center: center, radius: radius + size * 0.038, angle: .degrees(-68)))
 
-            // Counter-clockwise arc (left) → perfect fourths
+            // Counter-clockwise hint (left of pointer) → perfect fourths
             directionalArc(
                 center: center,
                 radius: radius,
-                startDegrees: -108,
-                endDegrees: -152,
+                startDegrees: -102,
+                endDegrees: -122,
                 clockwise: false,
-                lineWidth: size * 0.006
+                lineWidth: size * 0.0055
             )
             arrowHead(
                 center: center,
                 radius: radius,
-                tangentDegrees: -152,
+                tangentDegrees: -122,
                 pointingClockwise: false,
-                size: size * 0.028
+                size: size * 0.024
             )
             Text("완전4도")
-                .font(.system(size: size * 0.026, weight: .bold, design: .rounded))
+                .font(.system(size: size * 0.024, weight: .bold, design: .rounded))
                 .foregroundStyle(.secondary)
-                .position(point(center: center, radius: radius + size * 0.04, angle: .degrees(-130)))
+                .position(point(center: center, radius: radius + size * 0.038, angle: .degrees(-112)))
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
