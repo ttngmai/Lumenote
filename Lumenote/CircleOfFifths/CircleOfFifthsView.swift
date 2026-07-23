@@ -33,13 +33,13 @@ struct CircleOfFifthsView: View {
                 if isWide {
                     HStack(alignment: .top, spacing: 20) {
                         circleSection
-                        selectors
+                        selectors(stacked: true)
                             .frame(width: min(280, geo.size.width * 0.32))
                     }
                 } else {
                     VStack(spacing: 16) {
                         circleSection
-                        selectors
+                        selectors(stacked: false)
                     }
                 }
             }
@@ -71,18 +71,8 @@ struct CircleOfFifthsView: View {
 
     private var circleSection: some View {
         VStack(spacing: 12) {
-            VStack(spacing: 4) {
-                Text("Circle of Fifths")
-                    .font(.system(.title2, design: .rounded).weight(.bold))
-                Text(model.selectedKeyTitle)
-                    .font(.system(.title3, design: .rounded).weight(.semibold))
-                    .foregroundStyle(Color(red: 0.20, green: 0.35, blue: 0.55))
-                    .contentTransition(.numericText())
-                Text("\(model.sharpsOrFlatsDescription)  ·  \(model.diatonicScaleNotes.joined(separator: " "))")
-                    .font(.system(.footnote, design: .rounded))
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-            }
+            Text("Circle of Fifths")
+                .font(.system(.title2, design: .rounded).weight(.bold))
 
             CircleOfFifthsRingView(model: model)
                 .frame(maxWidth: 520)
@@ -94,9 +84,9 @@ struct CircleOfFifthsView: View {
 
     private var legend: some View {
         HStack(spacing: 14) {
-            legendItem(color: Color(red: 0.78, green: 0.22, blue: 0.22), title: "Major")
-            legendItem(color: Color(red: 0.22, green: 0.42, blue: 0.72), title: "Minor")
-            legendItem(color: Color(red: 0.45, green: 0.32, blue: 0.58), title: "Dim")
+            legendItem(color: Color(red: 0xE9 / 255, green: 0x5D / 255, blue: 0x5D / 255), title: "Major")
+            legendItem(color: Color(red: 0x4F / 255, green: 0x81 / 255, blue: 0xEE / 255), title: "Minor")
+            legendItem(color: Color(red: 0x9A / 255, green: 0x64 / 255, blue: 0xDB / 255), title: "Dim")
             legendItem(color: Color(red: 0.86, green: 0.86, blue: 0.86), title: "Non-diatonic")
         }
         .font(.system(.caption2, design: .rounded).weight(.semibold))
@@ -116,22 +106,36 @@ struct CircleOfFifthsView: View {
         }
     }
 
-    private var selectors: some View {
-        HStack(spacing: 12) {
-            pickerButton(
-                title: "Tonic",
-                value: model.selectedTonic.displayName,
-                isActive: activePicker == .tonic
-            ) {
-                togglePicker(.tonic)
-            }
+    @ViewBuilder
+    private func selectors(stacked: Bool) -> some View {
+        let tonicButton = pickerButton(
+            title: "Tonic",
+            value: model.selectedTonic.displayName,
+            isActive: activePicker == .tonic
+        ) {
+            togglePicker(.tonic)
+        }
 
-            pickerButton(
-                title: "Mode",
-                value: model.selectedMode.displayName,
-                isActive: activePicker == .mode
-            ) {
-                togglePicker(.mode)
+        let modeButton = pickerButton(
+            title: "Mode",
+            value: model.selectedMode.displayName,
+            isActive: activePicker == .mode
+        ) {
+            togglePicker(.mode)
+        }
+
+        // Landscape: one selector per row. Portrait: side by side.
+        Group {
+            if stacked {
+                VStack(spacing: 12) {
+                    tonicButton
+                    modeButton
+                }
+            } else {
+                HStack(spacing: 12) {
+                    tonicButton
+                    modeButton
+                }
             }
         }
         // Keep selector chrome height stable so the circle never jumps when a popup opens.
