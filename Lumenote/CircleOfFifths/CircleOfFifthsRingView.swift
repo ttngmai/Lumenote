@@ -20,7 +20,7 @@ struct CircleOfFifthsRingView: View {
     /// Base outer radius of the note ring.
     private let outerRadiusRatio: CGFloat = 0.48
     /// How much the 12 o'clock tonic wedge is scaled up (radial + slight angular overlap).
-    private let raisedScale: CGFloat = 1.1
+    private let raisedScale: CGFloat = 1.05
     private let raisedAngularPadDegrees: Double = 2.5
 
     private var displayedRotationDegrees: Double {
@@ -58,7 +58,6 @@ struct CircleOfFifthsRingView: View {
                 .rotationEffect(.degrees(displayedRotationDegrees))
 
                 centerHub(size: size)
-                fixedTonicPointer(center: center, size: size)
                 rotationAffordances(center: center, size: size)
             }
             .frame(width: geo.size.width, height: geo.size.height)
@@ -228,16 +227,6 @@ struct CircleOfFifthsRingView: View {
                 .font(.system(size: size * 0.03, weight: .semibold, design: .rounded))
                 .foregroundStyle(.secondary)
         }
-    }
-
-    private func fixedTonicPointer(center: CGPoint, size: CGFloat) -> some View {
-        let tip = CGPoint(x: center.x, y: center.y - size * outerRadiusRatio * raisedScale)
-        return Image(systemName: "arrowtriangle.down.fill")
-            .font(.system(size: size * 0.05))
-            .foregroundStyle(Color.primary)
-            .shadow(color: .black.opacity(0.2), radius: 1, y: 1)
-            .position(tip)
-            .accessibilityLabel("토닉 포인터")
     }
 
     // MARK: - Rotation affordances
@@ -479,7 +468,7 @@ private struct RaisedTonicWedgeView: View {
                     strokeWidth: 1.0
                 )
             }
-            .shadow(color: .black.opacity(0.3), radius: size * 0.02, x: 0, y: size * 0.012)
+            .shadow(color: .black.opacity(0.1), radius: size * 0.02, x: 0, y: size * 0.012)
             .frame(width: geo.size.width, height: geo.size.height)
         }
         .allowsHitTesting(false)
