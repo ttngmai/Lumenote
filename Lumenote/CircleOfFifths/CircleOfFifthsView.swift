@@ -71,9 +71,6 @@ struct CircleOfFifthsView: View {
 
     private var circleSection: some View {
         VStack(spacing: 12) {
-            Text("Circle of Fifths")
-                .font(.system(.title2, design: .rounded).weight(.bold))
-
             CircleOfFifthsRingView(model: model)
                 .frame(maxWidth: 520)
                 .padding(.horizontal, 4)
