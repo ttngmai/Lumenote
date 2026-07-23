@@ -1,0 +1,201 @@
+---
+alwaysApply: true
+---
+
+# GitHub Workflow Policy
+
+이 저장소의 코드를 수정하는 모든 구현 작업에 다음 규칙을 적용한다.
+
+## 1. 기본 원칙
+
+- GitHub Flow를 사용한다.
+- `main` 브랜치에서 직접 개발하거나 커밋하지 않는다.
+- 하나의 브랜치는 하나의 작업 목적만 가진다.
+- 하나의 Pull Request에는 하나의 설명 가능한 변경 목적만 포함한다.
+- 사용자와 관계없는 기존 변경사항을 수정하거나 커밋하지 않는다.
+- 사용자 작업을 임의로 discard, reset, stash, amend 또는 force push하지 않는다.
+- Pull Request는 생성할 수 있지만 직접 merge하지 않는다.
+
+질문, 코드 설명, 단순 분석처럼 파일을 수정하지 않는 작업에는 브랜치와 PR이 필요하지 않다.
+
+## 2. 작업 시작 전
+
+코드를 수정하기 전에 반드시 다음을 수행한다.
+
+1. `git status --short --branch`로 현재 상태를 확인한다.
+2. 현재 브랜치와 기존 수정사항을 확인한다.
+3. 기존 사용자 변경사항이 있으면 보존하고 작업 범위에 포함하지 않는다.
+4. 현재 브랜치가 `main`이고 working tree가 깨끗하면 다음 순서로 작업 브랜치를 만든다.
+
+```bash
+git fetch origin
+git pull --ff-only origin main
+git switch -c <branch-name>
+```
+
+working tree가 깨끗하지 않으면 기존 변경사항을 임의로 처리하지 말고,
+변경사항을 보존한 상태에서 새 브랜치를 만들 수 있는지 판단한다.
+
+## 3. 브랜치 이름
+
+다음 형식을 사용한다.
+
+`<type>/<issue-number>-<short-description>`
+
+Issue가 없다면 번호를 생략한다.
+
+허용되는 type:
+- feat: 새로운 기능
+- fix: 버그 수정
+- refactor: 동작 변화 없는 구조 개선
+- perf: 성능 개선
+- test: 테스트
+- docs: 문서
+- style: 포맷 및 스타일
+- build: 빌드 및 의존성
+- ci: CI 설정
+- chore: 기타 유지보수
+- hotfix: 긴급 수정
+
+브랜치 이름은 영문 소문자와 하이픈을 사용한다.
+
+예:
+```text
+feat/42-tap-tempo
+fix/audio-duplicate-click
+refactor/metronome-engine
+docs/project-setup
+```
+
+# 4. 구현 규칙
+
+- 코드를 작성하기 전에 기존 구현과 프로젝트 패턴을 검색한다.
+- 기존 구조를 재사용할 수 있으면 새로운 구조를 중복 생성하지 않는다.
+- 요청 범위와 관계없는 리팩터링을 섞지 않는다.
+- 테스트를 통과시키기 위해 테스트를 삭제하거나 무력화하지 않는다.
+- 비밀번호, API 키, 인증서, 토큰 및 개인정보를 커밋하지 않는다.
+- 생성된 파일, 빌드 결과물, 개인 Xcode 설정을 불필요하게 커밋하지 않는다.
+- 작업 중 발견한 별도의 문제는 현재 PR에 섞지 말고 최종 보고에 별도로 기록한다.
+
+# 5. 커밋 규칙
+
+Conventional Commits 형식을 사용한다.
+
+`<type>(<scope>): <description>`
+
+허용되는 type:
+- feat
+- fix
+- refactor
+- perf
+- test
+- docs
+- style
+- build
+- ci
+- chore
+
+해당 프로젝트에서의 권장 scope
+- metronome
+- audio
+- rhythm
+- theory
+- ear-training
+- fretboard
+- ui
+- navigation
+- project
+
+예:
+```text
+feat(metronome): 탭 템포 기능 추가
+fix(audio): BPM 변경 시 중복 클릭음 수정
+refactor(audio): 클릭 스케줄링 로직 분리
+test(metronome): 탭 간격 계산 테스트 추가
+```
+
+커밋할 때 다음 규칙을 지킨다.
+
+- 하나의 커밋에는 하나의 논리적 목적만 포함한다.
+- git add .를 무조건 사용하지 않는다.
+- 작업과 관련된 파일만 명시적으로 stage한다.
+- 커밋 전 git diff와 git diff --staged를 검토한다.
+- 이미 원격에 공유된 커밋을 임의로 amend하거나 force push하지 않는다.
+
+# 6. 검증 규칙
+
+커밋과 PR 생성 전에 다음을 수행한다.
+
+1. 변경된 파일 목록을 확인한다.
+2. git diff --check를 실행한다.
+3. 프로젝트에서 제공하는 빌드, 테스트 및 린트 명령을 실행한다.
+4. Swift 프로젝트라면 프로젝트와 scheme을 탐색해 가능한 빌드 또는 테스트를 실행한다.
+5. 검증할 수 없는 항목은 성공한 것처럼 표현하지 말고 PR에 명확히 기록한다.
+6. 테스트 실패가 기존 문제인지 이번 변경으로 발생한 문제인지 구분한다.
+
+# 7. Pull Request 규칙
+
+코드를 수정하는 구현 작업이 완료되면 Draft Pull Request를 생성한다.
+
+PR 제목은 Conventional Commits 형식을 사용한다.
+
+예:
+```text
+feat(metronome): 탭 템포 기능 추가
+fix(audio): 템포 변경 중 중복 클릭음 수정
+```
+
+PR 본문에는 반드시 다음 항목을 포함한다.
+
+```md
+## 변경 내용
+
+## 구현 방식
+
+## 검증 결과
+
+## 영향 범위
+
+## 관련 Issue
+
+## 참고 사항
+```
+
+관련 Issue가 있으면 다음 형식으로 연결한다.
+
+`Closes #42`
+
+PR 생성 절차:
+1. 현재 브랜치가 main이 아닌지 확인한다.
+2. 변경사항과 검증 결과를 최종 확인한다.
+3. 관련 파일만 커밋한다.
+4. 현재 브랜치를 원격에 push한다.
+5. main을 base로 Draft Pull Request를 생성한다.
+6. 생성된 Pull Request URL을 사용자에게 전달한다.
+
+사용할 수 있는 명령 예:
+```bash
+git push -u origin HEAD
+gh pr create --draft --base main
+```
+
+절대로 다음 작업을 자동으로 수행하지 않는다.
+
+- PR merge
+- main 직접 push
+- force push
+- 원격 브랜치 삭제
+- 기존 PR close
+- 실패한 테스트를 숨기거나 생략
+
+8. 최종 보고
+
+작업이 끝나면 다음을 보고한다.
+
+- 생성한 브랜치
+- 변경한 핵심 내용
+- 생성한 커밋
+- 실행한 빌드와 테스트
+- 실패하거나 실행하지 못한 검증
+- 생성된 Draft PR URL
+- 사용자가 직접 검토해야 할 사항
