@@ -20,6 +20,10 @@ struct CircleOfFifthsRingView: View {
     /// Outer radius of the note (major) ring, used by the fixed tonic pointer.
     private let outerRadiusRatio: CGFloat = 0.48
 
+    /// Screen-fixed wedge at 12 o'clock (under the tonic pointer) is slightly wider.
+    private let highlightedSpanDegrees: Double = 36
+    private var normalSpanDegrees: Double { (360 - highlightedSpanDegrees) / 11 }
+
     private var displayedRotationDegrees: Double {
         model.tonicAlignmentRotationDegrees + dragRotationDegrees
     }
@@ -178,12 +182,17 @@ struct CircleOfFifthsRingView: View {
         return ForEach(1...12, id: \.self) { position in
             let name = model.noteNames[position].map(CircleOfFifthsModel.Tonic.formatNoteName) ?? ""
             let isActive = model.activePositionSet.contains(position)
+            let isTonic = position == model.tonicArrowPosition
             Text(name)
-                .font(.system(size: size * 0.048, weight: .heavy, design: .rounded))
+                .font(.system(
+                    size: size * (isTonic ? 0.058 : 0.046),
+                    weight: .heavy,
+                    design: .rounded
+                ))
                 .foregroundStyle(isActive ? Color.white : Color.secondary)
                 .shadow(color: isActive ? .black.opacity(0.22) : .clear, radius: 1, y: 0.5)
                 .rotationEffect(.degrees(-displayedRotationDegrees))
-                .position(point(center: center, radius: radius, angle: angleForCenter(of: position)))
+                .position(point(center: center, radius: radius, angle: labelAngle(forModelPosition: position)))
         }
     }
 
@@ -194,11 +203,16 @@ struct CircleOfFifthsRingView: View {
             let raw = names[position] ?? ""
             let label = CircleOfFifthsModel.Tonic.formatNoteName(raw) + "m"
             let isActive = model.activePositionSet.contains(position)
+            let isTonic = position == model.tonicArrowPosition
             Text(label)
-                .font(.system(size: size * 0.028, weight: .bold, design: .rounded))
+                .font(.system(
+                    size: size * (isTonic ? 0.034 : 0.027),
+                    weight: .bold,
+                    design: .rounded
+                ))
                 .foregroundStyle(isActive ? Color.primary.opacity(0.85) : Color.secondary.opacity(0.55))
                 .rotationEffect(.degrees(-displayedRotationDegrees))
-                .position(point(center: center, radius: radius, angle: angleForCenter(of: position)))
+                .position(point(center: center, radius: radius, angle: labelAngle(forModelPosition: position)))
         }
     }
 
@@ -206,11 +220,16 @@ struct CircleOfFifthsRingView: View {
         let radius = size * 0.235
         return ForEach(Array(model.degreeLabels.keys.sorted()), id: \.self) { position in
             if let label = model.degreeLabels[position] {
+                let isTonic = position == model.tonicArrowPosition
                 Text(label)
-                    .font(.system(size: size * 0.036, weight: .bold, design: .rounded))
+                    .font(.system(
+                        size: size * (isTonic ? 0.044 : 0.034),
+                        weight: .bold,
+                        design: .rounded
+                    ))
                     .foregroundStyle(Color.primary)
                     .rotationEffect(.degrees(-displayedRotationDegrees))
-                    .position(point(center: center, radius: radius, angle: angleForCenter(of: position)))
+                    .position(point(center: center, radius: radius, angle: labelAngle(forModelPosition: position)))
             }
         }
     }
@@ -246,12 +265,16 @@ struct CircleOfFifthsRingView: View {
     /// the long way around the circle.
     private func rotationAffordances(center: CGPoint, size: CGFloat) -> some View {
         let radius = size * 0.52
-        // G wedge (screen position 1): leading −75° … trailing −45°, center −60°.
-        // F wedge (screen position 11): leading −135° … trailing −105°, center −120°.
-        let gStart = -72.0
-        let gEnd = -48.0
-        let fStart = -108.0
-        let fEnd = -132.0
+        // G = 1 step CW from tonic, F = 11 steps CW (1 step CCW).
+        let gLeading = alignedLeadingDegrees(stepsFromTonic: 1)
+        let gTrailing = gLeading + normalSpanDegrees
+        let fLeading = alignedLeadingDegrees(stepsFromTonic: 11)
+        let fTrailing = fLeading + normalSpanDegrees
+        // Short inset arcs within each wedge.
+        let gStart = gLeading + normalSpanDegrees * 0.12
+        let gEnd = gTrailing - normalSpanDegrees * 0.12
+        let fStart = fTrailing - normalSpanDegrees * 0.12
+        let fEnd = fLeading + normalSpanDegrees * 0.12
 
         return ZStack {
             // Clockwise over G → perfect fifths
@@ -273,7 +296,11 @@ struct CircleOfFifthsRingView: View {
             Text("완전5도")
                 .font(.system(size: size * 0.022, weight: .bold, design: .rounded))
                 .foregroundStyle(.secondary)
-                .position(point(center: center, radius: radius + size * 0.038, angle: .degrees(-60)))
+                .position(point(
+                    center: center,
+                    radius: radius + size * 0.038,
+                    angle: .degrees(alignedCenterDegrees(stepsFromTonic: 1))
+                ))
 
             // Counter-clockwise over F → perfect fourths
             directionalArc(
@@ -294,7 +321,11 @@ struct CircleOfFifthsRingView: View {
             Text("완전4도")
                 .font(.system(size: size * 0.022, weight: .bold, design: .rounded))
                 .foregroundStyle(.secondary)
-                .position(point(center: center, radius: radius + size * 0.038, angle: .degrees(-120)))
+                .position(point(
+                    center: center,
+                    radius: radius + size * 0.038,
+                    angle: .degrees(alignedCenterDegrees(stepsFromTonic: 11))
+                ))
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
@@ -374,14 +405,45 @@ struct CircleOfFifthsRingView: View {
 
     // MARK: - Geometry helpers
 
+    /// Clockwise steps from the selected tonic (0 = tonic / 12 o'clock when aligned).
+    private func stepsFromTonic(_ modelPosition: Int) -> Int {
+        var steps = (modelPosition - model.tonicArrowPosition) % 12
+        if steps < 0 { steps += 12 }
+        return steps
+    }
+
+    private func spanDegrees(stepsFromTonic steps: Int) -> Double {
+        steps == 0 ? highlightedSpanDegrees : normalSpanDegrees
+    }
+
+    /// Leading-edge angle of the wedge `steps` clockwise from the tonic, when tonic is at 12 o'clock.
+    private func alignedLeadingDegrees(stepsFromTonic steps: Int) -> Double {
+        let topLeading = -90 - highlightedSpanDegrees / 2
+        guard steps > 0 else { return topLeading }
+        return topLeading + highlightedSpanDegrees + Double(steps - 1) * normalSpanDegrees
+    }
+
+    private func alignedCenterDegrees(stepsFromTonic steps: Int) -> Double {
+        alignedLeadingDegrees(stepsFromTonic: steps) + spanDegrees(stepsFromTonic: steps) / 2
+    }
+
+    /// Screen clock position 12 → steps 0 (top); 1…11 → steps 1…11.
+    private func screenSteps(forClockPosition position: Int) -> Int {
+        position % 12
+    }
+
+    /// Label angle inside the rotating layer so the note lands on its screen wedge center.
+    private func labelAngle(forModelPosition position: Int) -> Angle {
+        let aligned = alignedCenterDegrees(stepsFromTonic: stepsFromTonic(position))
+        return .degrees(aligned - model.tonicAlignmentRotationDegrees)
+    }
+
     private func angleForLeadingEdge(of clockPosition: Int) -> Angle {
-        let clockDegrees = Double(clockPosition) * 30.0 - 15.0
-        return .degrees(clockDegrees - 90)
+        .degrees(alignedLeadingDegrees(stepsFromTonic: screenSteps(forClockPosition: clockPosition)))
     }
 
     private func angleForCenter(of clockPosition: Int) -> Angle {
-        let clockDegrees = Double(clockPosition) * 30.0
-        return .degrees(clockDegrees - 90)
+        .degrees(alignedCenterDegrees(stepsFromTonic: screenSteps(forClockPosition: clockPosition)))
     }
 
     private func point(center: CGPoint, radius: CGFloat, angle: Angle) -> CGPoint {
