@@ -15,11 +15,15 @@ struct CircleOfFifthsRingView: View {
     private let diminishedColor = Color(red: 0x9A / 255, green: 0x64 / 255, blue: 0xDB / 255)
     private let chromaticFill = Color(red: 0.86, green: 0.86, blue: 0.86)
     private let relativeFill = Color(red: 0.94, green: 0.94, blue: 0.95)
-    private let degreeFill = Color(red: 0.96, green: 0.96, blue: 0.94)
     private let ringStroke = Color(red: 0.15, green: 0.15, blue: 0.15)
 
-    /// Base outer radius of the note ring.
+    /// Base outer radius of the degree ring (outermost).
     private let outerRadiusRatio: CGFloat = 0.48
+    /// Note ring (middle) — thickest band.
+    private let noteOuterRatio: CGFloat = 0.41
+    private let noteInnerRatio: CGFloat = 0.265
+    /// Relative-key ring (innermost).
+    private let relativeInnerRatio: CGFloat = 0.175
     /// How much the 12 o'clock tonic wedge is scaled up (radial + slight angular overlap).
     private let raisedScale: CGFloat = 1.05
     private let raisedAngularPadDegrees: Double = 2.5
@@ -44,9 +48,11 @@ struct CircleOfFifthsRingView: View {
                 RaisedTonicWedgeView(
                     noteColor: noteColor(forScreenClock: 12),
                     relativeFill: relativeFill,
-                    degreeFill: degreeFill,
                     ringStroke: ringStroke,
                     outerRadiusRatio: outerRadiusRatio,
+                    noteOuterRatio: noteOuterRatio,
+                    noteInnerRatio: noteInnerRatio,
+                    relativeInnerRatio: relativeInnerRatio,
                     raisedScale: raisedScale,
                     angularPadDegrees: raisedAngularPadDegrees
                 )
@@ -94,21 +100,33 @@ struct CircleOfFifthsRingView: View {
     private func drawBaseRings(context: GraphicsContext, center: CGPoint, size: CGFloat) {
         let radii = ringRadii(size: size, scale: 1)
 
-        // Note ring — skip position 12; the raised overlay redraws it.
+        // Outer → inner: degree, note, relative. Skip position 12; raised overlay redraws it.
         for position in 1...12 where position != 12 {
+            let color = noteColor(forScreenClock: position)
+
+            // Degree ring (outermost) — same fill as the related note cell.
+            fillSector(
+                context: context,
+                center: center,
+                inner: radii.degreeInner,
+                outer: radii.degreeOuter,
+                clockPosition: position,
+                color: color,
+                angularPad: 0
+            )
+
+            // Note ring (middle, thickest)
             fillSector(
                 context: context,
                 center: center,
                 inner: radii.noteInner,
                 outer: radii.noteOuter,
                 clockPosition: position,
-                color: noteColor(forScreenClock: position),
+                color: color,
                 angularPad: 0
             )
-        }
 
-        // Relative-key ring
-        for position in 1...12 where position != 12 {
+            // Relative-key ring (innermost)
             fillSector(
                 context: context,
                 center: center,
@@ -120,32 +138,17 @@ struct CircleOfFifthsRingView: View {
             )
         }
 
-        // Degree ring background (full ring; raised wedge redraws the top slice on top)
-        var degreeRing = Path()
-        degreeRing.addArc(
-            center: center,
-            radius: (radii.degreeOuter + radii.degreeInner) / 2,
-            startAngle: .degrees(0),
-            endAngle: .degrees(360),
-            clockwise: false
-        )
-        context.stroke(
-            degreeRing,
-            with: .color(degreeFill),
-            style: StrokeStyle(lineWidth: radii.degreeOuter - radii.degreeInner)
-        )
-
         // Separators (all 12; raised wedge covers the top pair)
         for position in 1...12 {
             let angle = angleForLeadingEdge(of: position)
             var line = Path()
-            line.move(to: point(center: center, radius: radii.degreeInner, angle: angle))
-            line.addLine(to: point(center: center, radius: radii.noteOuter, angle: angle))
+            line.move(to: point(center: center, radius: radii.relativeInner, angle: angle))
+            line.addLine(to: point(center: center, radius: radii.degreeOuter, angle: angle))
             context.stroke(line, with: .color(ringStroke.opacity(0.3)), lineWidth: 0.8)
         }
 
         // Ring outlines
-        for radius in [radii.noteOuter, radii.noteInner, radii.relativeInner, radii.degreeInner] {
+        for radius in [radii.degreeOuter, radii.noteOuter, radii.noteInner, radii.relativeInner] {
             var circle = Path()
             circle.addEllipse(
                 in: CGRect(
@@ -158,7 +161,7 @@ struct CircleOfFifthsRingView: View {
             context.stroke(
                 circle,
                 with: .color(ringStroke),
-                lineWidth: radius == radii.noteOuter ? 1.8 : 1.1
+                lineWidth: radius == radii.degreeOuter ? 1.8 : 1.1
             )
         }
     }
@@ -166,7 +169,8 @@ struct CircleOfFifthsRingView: View {
     // MARK: - Labels
 
     private func noteLabels(center: CGPoint, size: CGFloat) -> some View {
-        let baseRadius = size * 0.432
+        // Midpoint of the note ring (thickest / middle band).
+        let baseRadius = size * ((noteOuterRatio + noteInnerRatio) / 2)
         return ForEach(1...12, id: \.self) { position in
             let name = model.noteNames[position].map(CircleOfFifthsModel.Tonic.formatNoteName) ?? ""
             let isActive = model.activePositionSet.contains(position)
@@ -187,7 +191,8 @@ struct CircleOfFifthsRingView: View {
     }
 
     private func relativeMinorLabels(center: CGPoint, size: CGFloat) -> some View {
-        let baseRadius = size * 0.34
+        // Midpoint of the relative-key ring (innermost).
+        let baseRadius = size * ((noteInnerRatio + relativeInnerRatio) / 2)
         let names = model.relativeMinorNames
         return ForEach(1...12, id: \.self) { position in
             let raw = names[position] ?? ""
@@ -209,9 +214,11 @@ struct CircleOfFifthsRingView: View {
     }
 
     private func degreeLabels(center: CGPoint, size: CGFloat) -> some View {
-        let baseRadius = size * 0.235
+        // Midpoint of the degree ring (outermost).
+        let baseRadius = size * ((outerRadiusRatio + noteOuterRatio) / 2)
         return ForEach(Array(model.degreeLabels.keys.sorted()), id: \.self) { position in
             if let label = model.degreeLabels[position] {
+                let isActive = model.activePositionSet.contains(position)
                 let isTonic = position == model.tonicArrowPosition
                 let radius = isTonic ? baseRadius * raisedScale : baseRadius
                 Text(label)
@@ -220,7 +227,8 @@ struct CircleOfFifthsRingView: View {
                         weight: .bold,
                         design: .rounded
                     ))
-                    .foregroundStyle(Color.primary)
+                    .foregroundStyle(isActive ? Color.white : Color.secondary)
+                    .shadow(color: isActive ? .black.opacity(0.22) : .clear, radius: 1, y: 0.5)
                     .rotationEffect(.degrees(-displayedRotationDegrees))
                     .position(point(center: center, radius: radius, angle: angleForCenter(of: position)))
                     .zIndex(isTonic ? 1 : 0)
@@ -391,22 +399,25 @@ struct CircleOfFifthsRingView: View {
     // MARK: - Drawing helpers
 
     private struct RingRadii {
-        var noteOuter: CGFloat
-        var noteInner: CGFloat
-        var relativeOuter: CGFloat
-        var relativeInner: CGFloat
+        /// Outermost: degree labels.
         var degreeOuter: CGFloat
         var degreeInner: CGFloat
+        /// Middle (thickest): note names.
+        var noteOuter: CGFloat
+        var noteInner: CGFloat
+        /// Innermost: relative keys.
+        var relativeOuter: CGFloat
+        var relativeInner: CGFloat
     }
 
     private func ringRadii(size: CGFloat, scale: CGFloat) -> RingRadii {
         RingRadii(
-            noteOuter: size * outerRadiusRatio * scale,
-            noteInner: size * 0.385 * scale,
-            relativeOuter: size * 0.385 * scale,
-            relativeInner: size * 0.295 * scale,
-            degreeOuter: size * 0.295 * scale,
-            degreeInner: size * 0.175 * scale
+            degreeOuter: size * outerRadiusRatio * scale,
+            degreeInner: size * noteOuterRatio * scale,
+            noteOuter: size * noteOuterRatio * scale,
+            noteInner: size * noteInnerRatio * scale,
+            relativeOuter: size * noteInnerRatio * scale,
+            relativeInner: size * relativeInnerRatio * scale
         )
     }
 
@@ -465,9 +476,11 @@ struct CircleOfFifthsRingView: View {
 private struct RaisedTonicWedgeView: View {
     let noteColor: Color
     let relativeFill: Color
-    let degreeFill: Color
     let ringStroke: Color
     let outerRadiusRatio: CGFloat
+    let noteOuterRatio: CGFloat
+    let noteInnerRatio: CGFloat
+    let relativeInnerRatio: CGFloat
     let raisedScale: CGFloat
     let angularPadDegrees: Double
 
@@ -478,7 +491,7 @@ private struct RaisedTonicWedgeView: View {
                 // Soft contact shadow.
                 AnnularSector(
                     clockPosition: 12,
-                    innerRatio: 0.175 * raisedScale,
+                    innerRatio: relativeInnerRatio * raisedScale,
                     outerRatio: outerRadiusRatio * raisedScale,
                     angularPadDegrees: angularPadDegrees
                 )
@@ -486,22 +499,23 @@ private struct RaisedTonicWedgeView: View {
                 .offset(y: size * 0.01)
                 .blur(radius: size * 0.014)
 
+                // Outer → inner: degree, note, relative (degree shares note color).
                 band(
-                    innerRatio: 0.385 * raisedScale,
+                    innerRatio: noteOuterRatio * raisedScale,
                     outerRatio: outerRadiusRatio * raisedScale,
                     fill: noteColor,
                     strokeWidth: 1.6
                 )
                 band(
-                    innerRatio: 0.295 * raisedScale,
-                    outerRatio: 0.385 * raisedScale,
-                    fill: relativeFill,
+                    innerRatio: noteInnerRatio * raisedScale,
+                    outerRatio: noteOuterRatio * raisedScale,
+                    fill: noteColor,
                     strokeWidth: 1.1
                 )
                 band(
-                    innerRatio: 0.175 * raisedScale,
-                    outerRatio: 0.295 * raisedScale,
-                    fill: degreeFill,
+                    innerRatio: relativeInnerRatio * raisedScale,
+                    outerRatio: noteInnerRatio * raisedScale,
+                    fill: relativeFill,
                     strokeWidth: 1.0
                 )
             }
