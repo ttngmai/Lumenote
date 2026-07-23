@@ -22,7 +22,7 @@ jobs:
           PR_TITLE: ${{ github.event.pull_request.title }}
         shell: bash
         run: |
-          pattern='^(feat|fix|refactor|perf|test|docs|style|build|ci|chore)(\([a-z0-9][a-z0-9-]*\))?(!)?: .+'
+          pattern='^(feat|fix|refactor|perf|test|docs|style|build|ci|chore|hotfix)(\([a-z0-9][a-z0-9-]*\))?(!)?: .+'
 
           if [[ ! "$PR_TITLE" =~ $pattern ]]; then
             echo "::error::PR 제목이 Conventional Commits 형식이 아닙니다."
