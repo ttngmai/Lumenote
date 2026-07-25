@@ -37,6 +37,7 @@ struct CircleOfFifthsView: View {
                         ScrollView {
                             selectors(stacked: true)
                         }
+                        .scrollIndicators(.hidden)
                         .frame(width: min(280, geo.size.width * 0.32))
                     }
                 } else {
@@ -46,6 +47,7 @@ struct CircleOfFifthsView: View {
                             selectors(stacked: false)
                         }
                     }
+                    .scrollIndicators(.hidden)
                 }
             }
             .padding(16)
@@ -75,7 +77,7 @@ struct CircleOfFifthsView: View {
     }
 
     private var circleSection: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 2) {
             CircleOfFifthsRingView(model: model)
                 .frame(maxWidth: 520)
                 .padding(.horizontal, 4)
@@ -232,7 +234,7 @@ struct CircleOfFifthsView: View {
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(Color.black.opacity(0.75), lineWidth: 1.5)
+                .strokeBorder(Color.black.opacity(0.75), lineWidth: 1.5)
         )
         .accessibilityElement(children: .contain)
         .accessibilityLabel("모드 캐릭터, \(character.summary)")
@@ -330,7 +332,7 @@ struct CircleOfFifthsView: View {
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(Color.black.opacity(0.75), lineWidth: 1.5)
+                .strokeBorder(Color.black.opacity(0.75), lineWidth: 1.5)
         )
         .accessibilityElement(children: .contain)
         .accessibilityLabel("스케일 구성음")
@@ -369,7 +371,10 @@ struct CircleOfFifthsView: View {
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(isActive ? Color.black : Color.black.opacity(0.75), lineWidth: isActive ? 2.5 : 1.5)
+                    .strokeBorder(
+                        isActive ? Color.black : Color.black.opacity(0.75),
+                        lineWidth: isActive ? 2.5 : 1.5
+                    )
             )
         }
         .buttonStyle(.plain)

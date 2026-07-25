@@ -75,9 +75,11 @@ struct CircleOfFifthsRingView: View {
                     ZStack {
                         noteLabels(center: localCenter, size: size)
                         relativeMinorLabels(center: localCenter, size: size)
-                        degreeLabels(center: localCenter, size: size)
                     }
                     .rotationEffect(.degrees(displayedRotationDegrees))
+
+                    // Degree numerals stay fixed on screen (aligned to the pinned tonic wedges).
+                    degreeLabels(center: localCenter, size: size)
 
                     centerHub(size: size)
                     rotationAffordances(center: localCenter, size: size)
@@ -188,6 +190,11 @@ struct CircleOfFifthsRingView: View {
         )
         let emphasisFill = Color(red: 1.0, green: 0.82, blue: 0.28).opacity(0.42)
         let emphasisStroke = Color(red: 0.92, green: 0.55, blue: 0.08)
+        let emphasisLineWidth: CGFloat = 2.4
+        // The stroke is centered on the path, so inset the outline by half the line
+        // width (radially and angularly) to keep the border fully inside the cell.
+        let radialInset = emphasisLineWidth / 2
+        let angularInsetDegrees = Double(radialInset / radii.degreeOuter) * 180 / .pi
         for screenPosition in emphasizedScreens where screenPosition != 12 {
             fillSector(
                 context: context,
@@ -196,17 +203,17 @@ struct CircleOfFifthsRingView: View {
                 outer: radii.degreeOuter,
                 clockPosition: screenPosition,
                 color: emphasisFill,
-                angularPad: 1.2
+                angularPad: 0
             )
             strokeSector(
                 context: context,
                 center: center,
-                inner: radii.relativeInner,
-                outer: radii.degreeOuter,
+                inner: radii.relativeInner + radialInset,
+                outer: radii.degreeOuter - radialInset,
                 clockPosition: screenPosition,
                 color: emphasisStroke,
-                lineWidth: 2.4,
-                angularPad: 1.2
+                lineWidth: emphasisLineWidth,
+                angularPad: -angularInsetDegrees
             )
         }
     }
@@ -257,6 +264,8 @@ struct CircleOfFifthsRingView: View {
                     weight: .bold,
                     design: .rounded
                 ))
+                .lineLimit(1)
+                .fixedSize()
                 .foregroundStyle(isActive ? Color.primary.opacity(0.85) : Color.secondary.opacity(0.55))
                 .rotationEffect(.degrees(-displayedRotationDegrees))
                 .position(point(center: center, radius: radius, angle: angleForCenter(of: position)))
@@ -265,12 +274,14 @@ struct CircleOfFifthsRingView: View {
     }
 
     private func degreeLabels(center: CGPoint, size: CGFloat) -> some View {
-        // Midpoint of the degree ring (outermost).
+        // Midpoint of the degree ring (outermost). Degrees are pinned to screen wedges
+        // (tonic at 12 o'clock) and never rotate with the ring.
         let baseRadius = size * ((outerRadiusRatio + noteOuterRatio) / 2)
         return ForEach(Array(model.degreeLabels.keys.sorted()), id: \.self) { position in
             if let label = model.degreeLabels[position] {
+                let screenPosition = model.screenClock(forModelPosition: position)
                 let isActive = model.activePositionSet.contains(position)
-                let isTonic = position == model.tonicArrowPosition
+                let isTonic = screenPosition == 12
                 let radius = isTonic ? baseRadius * raisedScale : baseRadius
                 Text(label)
                     .font(.system(
@@ -278,10 +289,11 @@ struct CircleOfFifthsRingView: View {
                         weight: .bold,
                         design: .rounded
                     ))
+                    .lineLimit(1)
+                    .fixedSize()
                     .foregroundStyle(isActive ? Color.white : Color.secondary)
                     .shadow(color: isActive ? .black.opacity(0.22) : .clear, radius: 1, y: 0.5)
-                    .rotationEffect(.degrees(-displayedRotationDegrees))
-                    .position(point(center: center, radius: radius, angle: angleForCenter(of: position)))
+                    .position(point(center: center, radius: radius, angle: angleForCenter(of: screenPosition)))
                     .zIndex(isTonic ? 1 : 0)
             }
         }
@@ -592,6 +604,14 @@ private struct RaisedTonicWedgeView: View {
                 )
 
                 if isEmphasized {
+                    // Inset the stroke by half the line width so the border stays
+                    // inside the raised wedge outline (stroke is path-centered).
+                    let emphasisLineWidth: CGFloat = 2.4
+                    let insetRatio = emphasisLineWidth / 2 / size
+                    let angularInsetDegrees = Double(
+                        (emphasisLineWidth / 2) / (size * outerRadiusRatio * raisedScale)
+                    ) * 180 / .pi
+
                     AnnularSector(
                         clockPosition: 12,
                         innerRatio: relativeInnerRatio * raisedScale,
@@ -602,11 +622,11 @@ private struct RaisedTonicWedgeView: View {
                     .overlay(
                         AnnularSector(
                             clockPosition: 12,
-                            innerRatio: relativeInnerRatio * raisedScale,
-                            outerRatio: outerRadiusRatio * raisedScale,
-                            angularPadDegrees: angularPadDegrees
+                            innerRatio: relativeInnerRatio * raisedScale + insetRatio,
+                            outerRatio: outerRadiusRatio * raisedScale - insetRatio,
+                            angularPadDegrees: angularPadDegrees - angularInsetDegrees
                         )
-                        .stroke(Color(red: 0.92, green: 0.55, blue: 0.08), lineWidth: 2.4)
+                        .stroke(Color(red: 0.92, green: 0.55, blue: 0.08), lineWidth: emphasisLineWidth)
                     )
                 }
             }
