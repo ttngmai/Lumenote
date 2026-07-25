@@ -130,6 +130,28 @@ final class CircleOfFifthsModel {
         "\(selectedTonic.displayName) \(selectedMode.shortName)"
     }
 
+    /// Key-signature accidentals in writing order, placed on a treble staff.
+    /// Beyond seven, an accidental doubles the one already occupying its slot.
+    var keySignatureAccidentals: [KeySignatureAccidental] {
+        let index = keySignatureIndex
+        guard index != 0 else { return [] }
+
+        let isSharp = index > 0
+        let steps = isSharp ? Self.sharpStaffSteps : Self.flatStaffSteps
+        var symbols = [String?](repeating: nil, count: 7)
+        for ordinal in 0..<min(abs(index), 14) {
+            let isDouble = ordinal >= 7
+            symbols[ordinal % 7] = isSharp
+                ? (isDouble ? "𝄪" : "♯")
+                : (isDouble ? "𝄫" : "♭")
+        }
+
+        return (0..<7).compactMap { slot in
+            guard let symbol = symbols[slot] else { return nil }
+            return KeySignatureAccidental(order: slot, symbol: symbol, staffStep: steps[slot])
+        }
+    }
+
     /// Scale tones (degree + note) in ascending order from the tonic.
     var scaleTones: [ScaleTone] {
         let names = noteNames
@@ -249,6 +271,17 @@ final class CircleOfFifthsModel {
     }
 
     // MARK: - Types
+
+    /// One accidental of a key signature on a treble staff.
+    struct KeySignatureAccidental: Identifiable, Equatable {
+        /// Position in the conventional writing order (F, C, G, D, A, E, B).
+        let order: Int
+        let symbol: String
+        /// Half-space steps above the bottom staff line (E4 = 0, F4 = 1, …).
+        let staffStep: Int
+
+        var id: Int { order }
+    }
 
     struct ScaleTone: Identifiable, Equatable {
         let scaleDegree: Int
@@ -567,6 +600,12 @@ final class CircleOfFifthsModel {
 
     /// Scale degrees for Lydian around the circle (clockwise from start).
     private static let lydianDegrees = [1, 5, 2, 6, 3, 7, 4]
+
+    /// Treble-staff placement of sharps in writing order: F5, C5, G5, D5, A4, E5, B4.
+    private static let sharpStaffSteps = [8, 5, 9, 6, 3, 7, 4]
+
+    /// Treble-staff placement of flats in writing order: B4, E5, A4, D5, G4, C5, F4.
+    private static let flatStaffSteps = [4, 7, 3, 6, 2, 5, 1]
 
     /// Key-signature index → note names at clock positions 1…12.
     private static let keySignatures: [Int: [String]] = [

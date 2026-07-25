@@ -300,13 +300,23 @@ struct CircleOfFifthsRingView: View {
     }
 
     private func centerHub(size: CGFloat) -> some View {
-        VStack(spacing: 2) {
-            Text(model.selectedTonic.displayName)
-                .font(.system(size: size * 0.065, weight: .heavy, design: .rounded))
-            Text(model.selectedMode.shortName)
-                .font(.system(size: size * 0.03, weight: .semibold, design: .rounded))
-                .foregroundStyle(.secondary)
+        VStack(spacing: size * 0.022) {
+            VStack(spacing: 2) {
+                Text(model.selectedTonic.displayName)
+                    .font(.system(size: size * 0.06, weight: .heavy, design: .rounded))
+                Text(model.selectedMode.shortName)
+                    .font(.system(size: size * 0.028, weight: .semibold, design: .rounded))
+                    .foregroundStyle(.secondary)
+            }
+
+            KeySignatureStaffView(
+                accidentals: model.keySignatureAccidentals,
+                staffSpace: size * 0.015,
+                lineColor: ringStroke.opacity(0.85)
+            )
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(model.selectedKeyTitle), \(model.sharpsOrFlatsDescription)")
     }
 
     // MARK: - Rotation affordances
