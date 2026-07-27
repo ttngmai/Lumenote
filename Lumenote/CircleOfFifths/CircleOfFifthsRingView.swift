@@ -5,14 +5,13 @@ import SwiftUI
 struct CircleOfFifthsRingView: View {
     @Bindable var model: CircleOfFifthsModel
 
-    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.appPalette) private var palette
 
     @State private var ringRotationDegrees: Double = 0
     @State private var dragRotationDegrees: Double = 0
     @State private var dragStartAngle: Double?
     @State private var rotationAtDragStart: Double = 0
 
-    private var palette: AppPalette { AppPalette(colorScheme: colorScheme) }
     private var chromaticFill: Color { palette.chromaticFill }
     private var relativeFill: Color { palette.relativeFill }
     private var ringStroke: Color { palette.ringStroke }
@@ -71,7 +70,7 @@ struct CircleOfFifthsRingView: View {
                         },
                         emphasisFill: palette.emphasisFill,
                         emphasisStroke: palette.emphasisStroke,
-                        shadowOpacity: colorScheme == .dark ? 0.45 : 0.2
+                        shadowOpacity: palette.raisedWedgeShadowOpacity
                     )
 
                     // Rotating labels.
@@ -233,10 +232,9 @@ struct CircleOfFifthsRingView: View {
             let isEmphasized = model.emphasizedClockPositions.contains(position)
             let radius = isTonic ? baseRadius * raisedScale : baseRadius
             Text(name)
-                .font(.system(
+                .font(LumenoteFont.rounded(
                     size: size * (isTonic ? 0.055 : 0.048),
-                    weight: .heavy,
-                    design: .rounded
+                    weight: .heavy
                 ))
                 .foregroundStyle(isActive ? Color.white : Color.secondary)
                 .shadow(color: isActive ? .black.opacity(0.22) : .clear, radius: 1, y: 0.5)
@@ -262,10 +260,9 @@ struct CircleOfFifthsRingView: View {
             let isTonic = position == model.tonicArrowPosition
             let radius = isTonic ? baseRadius * raisedScale : baseRadius
             Text(label)
-                .font(.system(
+                .font(LumenoteFont.rounded(
                     size: size * (isTonic ? 0.032 : 0.028),
-                    weight: .bold,
-                    design: .rounded
+                    weight: .bold
                 ))
                 .lineLimit(1)
                 .fixedSize()
@@ -287,10 +284,9 @@ struct CircleOfFifthsRingView: View {
                 let isTonic = screenPosition == 12
                 let radius = isTonic ? baseRadius * raisedScale : baseRadius
                 Text(label)
-                    .font(.system(
+                    .font(LumenoteFont.rounded(
                         size: size * (isTonic ? 0.04 : 0.036),
-                        weight: .bold,
-                        design: .rounded
+                        weight: .bold
                     ))
                     .lineLimit(1)
                     .fixedSize()
@@ -304,11 +300,11 @@ struct CircleOfFifthsRingView: View {
 
     private func centerHub(size: CGFloat) -> some View {
         VStack(spacing: size * 0.022) {
-            VStack(spacing: 2) {
+            VStack(spacing: LumenoteSpacing.xxs) {
                 Text(model.selectedTonic.displayName)
-                    .font(.system(size: size * 0.06, weight: .heavy, design: .rounded))
+                    .font(LumenoteFont.rounded(size: size * 0.06, weight: .heavy))
                 Text(model.selectedMode.shortName)
-                    .font(.system(size: size * 0.028, weight: .semibold, design: .rounded))
+                    .font(LumenoteFont.rounded(size: size * 0.028, weight: .semibold))
                     .foregroundStyle(.secondary)
             }
 
@@ -348,7 +344,7 @@ struct CircleOfFifthsRingView: View {
                 size: size * 0.024
             )
             Text("완전5도")
-                .font(.system(size: size * 0.022, weight: .bold, design: .rounded))
+                .font(LumenoteFont.rounded(size: size * 0.022, weight: .bold))
                 .foregroundStyle(.secondary)
                 .position(point(center: center, radius: radius + size * 0.038, angle: .degrees(-60)))
 
@@ -368,7 +364,7 @@ struct CircleOfFifthsRingView: View {
                 size: size * 0.024
             )
             Text("완전4도")
-                .font(.system(size: size * 0.022, weight: .bold, design: .rounded))
+                .font(LumenoteFont.rounded(size: size * 0.022, weight: .bold))
                 .foregroundStyle(.secondary)
                 .position(point(center: center, radius: radius + size * 0.038, angle: .degrees(-120)))
         }
@@ -709,5 +705,6 @@ private struct AnnularSector: Shape {
 
 #Preview {
     CircleOfFifthsRingView(model: CircleOfFifthsModel())
+        .lumenotePalette()
         .padding()
 }

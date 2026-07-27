@@ -3,14 +3,12 @@
 import SwiftUI
 
 struct CircleOfFifthsView: View {
-    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.appPalette) private var palette
     @AppStorage(AppearanceMode.storageKey) private var appearance: AppearanceMode = .system
 
     @State private var model = CircleOfFifthsModel()
     @State private var activePicker: ActivePicker?
     @State private var emphasisClearToken = UUID()
-
-    private var palette: AppPalette { AppPalette(colorScheme: colorScheme) }
 
     private enum ActivePicker: Identifiable, Equatable {
         case tonic
@@ -37,13 +35,13 @@ struct CircleOfFifthsView: View {
 
             Group {
                 if isWide {
-                    HStack(alignment: .top, spacing: 20) {
+                    HStack(alignment: .top, spacing: LumenoteSpacing.section) {
                         circleSection
                         ScrollView {
-                            VStack(spacing: 12) {
+                            VStack(spacing: LumenoteSpacing.xl) {
                                 HStack {
                                     Spacer(minLength: 0)
-                                    appearanceToggle
+                                    AppearanceToggleButton(appearance: $appearance)
                                 }
                                 selectors(stacked: true)
                             }
@@ -53,7 +51,7 @@ struct CircleOfFifthsView: View {
                     }
                 } else {
                     ScrollView {
-                        VStack(spacing: 16) {
+                        VStack(spacing: LumenoteSpacing.xxxl) {
                             circleSection
                             selectors(stacked: false)
                         }
@@ -61,11 +59,11 @@ struct CircleOfFifthsView: View {
                     .scrollIndicators(.hidden)
                     // Sits in the empty corner beside the circle, so it costs no layout height.
                     .overlay(alignment: .topTrailing) {
-                        appearanceToggle
+                        AppearanceToggleButton(appearance: $appearance)
                     }
                 }
             }
-            .padding(16)
+            .padding(LumenoteSpacing.xxxl)
             .frame(width: geo.size.width, height: geo.size.height, alignment: .top)
         }
         .background(background)
@@ -88,54 +86,24 @@ struct CircleOfFifthsView: View {
         .ignoresSafeArea()
     }
 
-    private var appearanceToggle: some View {
-        let isDark = colorScheme == .dark
-        return Button {
-            appearance = isDark ? .light : .dark
-        } label: {
-            Image(systemName: isDark ? "sun.max.fill" : "moon.fill")
-                .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(.primary)
-                .frame(width: 34, height: 34)
-                .background(Circle().fill(palette.cardBackground))
-                .overlay(Circle().strokeBorder(palette.cardBorder, lineWidth: 1.2))
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(isDark ? "라이트 모드로 전환" : "다크 모드로 전환")
-    }
-
     private var circleSection: some View {
-        VStack(spacing: 2) {
+        VStack(spacing: LumenoteSpacing.xxs) {
             CircleOfFifthsRingView(model: model)
                 .frame(maxWidth: 520)
-                .padding(.horizontal, 4)
+                .padding(.horizontal, LumenoteSpacing.xs)
 
             legend
         }
     }
 
     private var legend: some View {
-        HStack(spacing: 14) {
-            legendItem(color: palette.major, title: "Major")
-            legendItem(color: palette.minor, title: "Minor")
-            legendItem(color: palette.diminished, title: "Dim")
-            legendItem(color: palette.chromaticFill, title: "Non-diatonic")
+        HStack(spacing: LumenoteSpacing.xxl) {
+            LegendSwatch(color: palette.major, title: "Major")
+            LegendSwatch(color: palette.minor, title: "Minor")
+            LegendSwatch(color: palette.diminished, title: "Dim")
+            LegendSwatch(color: palette.chromaticFill, title: "Non-diatonic")
         }
-        .font(.system(.caption2, design: .rounded).weight(.semibold))
-    }
-
-    private func legendItem(color: Color, title: String) -> some View {
-        HStack(spacing: 5) {
-            RoundedRectangle(cornerRadius: 3, style: .continuous)
-                .fill(color)
-                .frame(width: 12, height: 12)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 3, style: .continuous)
-                        .stroke(Color.primary.opacity(0.2), lineWidth: 0.5)
-                )
-            Text(title)
-                .foregroundStyle(.secondary)
-        }
+        .font(LumenoteFont.caption2(.semibold))
     }
 
     @ViewBuilder
@@ -158,15 +126,15 @@ struct CircleOfFifthsView: View {
 
         // Landscape: one selector per row. Portrait: side by side.
         // Scale table sits under Tonic / Mode in both layouts.
-        VStack(spacing: 12) {
+        VStack(spacing: LumenoteSpacing.xl) {
             Group {
                 if stacked {
-                    VStack(spacing: 12) {
+                    VStack(spacing: LumenoteSpacing.xl) {
                         tonicButton
                         modeButton
                     }
                 } else {
-                    HStack(spacing: 12) {
+                    HStack(spacing: LumenoteSpacing.xl) {
                         tonicButton
                         modeButton
                     }
@@ -189,26 +157,26 @@ struct CircleOfFifthsView: View {
     private var modeCharacterCard: some View {
         let character = model.modeCharacter
 
-        return VStack(alignment: .leading, spacing: 10) {
+        return VStack(alignment: .leading, spacing: LumenoteSpacing.lg) {
             Text("Mode Character")
-                .font(.system(.caption, design: .rounded).weight(.bold))
+                .font(LumenoteFont.caption(.bold))
                 .foregroundStyle(.secondary)
 
             Text(character.summary)
-                .font(.system(.body, design: .rounded).weight(.semibold))
+                .font(LumenoteFont.body(.semibold))
                 .foregroundStyle(.primary)
                 .fixedSize(horizontal: false, vertical: true)
 
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: LumenoteSpacing.sm) {
                 Text("Formula")
-                    .font(.system(.caption2, design: .rounded).weight(.semibold))
+                    .font(LumenoteFont.caption2(.semibold))
                     .foregroundStyle(.secondary)
 
-                HStack(spacing: 2) {
+                HStack(spacing: LumenoteSpacing.xxs) {
                     ForEach(Array(character.formula.enumerated()), id: \.element.id) { index, tone in
                         if index > 0 {
                             Text("·")
-                                .font(.system(.caption, design: .rounded).weight(.semibold))
+                                .font(LumenoteFont.caption(.semibold))
                                 .foregroundStyle(.secondary.opacity(0.5))
                         }
 
@@ -219,14 +187,11 @@ struct CircleOfFifthsView: View {
                             flashEmphasis(scaleDegrees: [tone.scaleDegree])
                         } label: {
                             Text(tone.symbol)
-                                .font(.system(.callout, design: .rounded).weight(isLit ? .bold : .semibold))
+                                .font(LumenoteFont.callout(isLit ? .bold : .semibold))
                                 .foregroundStyle(isLit ? Color.primary : Color.secondary)
                                 .frame(maxWidth: .infinity)
-                                .padding(.vertical, 4)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 5, style: .continuous)
-                                        .fill(isLit ? palette.highlight : Color.clear)
-                                )
+                                .padding(.vertical, LumenoteSpacing.xs)
+                                .background(HighlightChipBackground(isLit: isLit))
                         }
                         .buttonStyle(.plain)
                         .frame(maxWidth: .infinity)
@@ -235,7 +200,7 @@ struct CircleOfFifthsView: View {
             }
 
             if character.characteristicNote != nil || character.characteristicChord != nil {
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: LumenoteSpacing.sm) {
                     if let note = character.characteristicNote {
                         characteristicRow(symbol: "★", text: note.text) {
                             flashEmphasis(
@@ -255,15 +220,10 @@ struct CircleOfFifthsView: View {
                 }
             }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
+        .padding(.horizontal, LumenoteSpacing.xxl)
+        .padding(.vertical, LumenoteSpacing.xl)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(palette.cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(palette.cardBorder, lineWidth: 1.5)
-        )
+        .lumenoteCard()
         .accessibilityElement(children: .contain)
         .accessibilityLabel("모드 캐릭터, \(character.summary)")
     }
@@ -274,20 +234,20 @@ struct CircleOfFifthsView: View {
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            HStack(alignment: .firstTextBaseline, spacing: 6) {
+            HStack(alignment: .firstTextBaseline, spacing: LumenoteSpacing.sm) {
                 Text(symbol)
-                    .font(.system(.subheadline, design: .rounded).weight(.bold))
+                    .font(LumenoteFont.subheadline(.bold))
                     .foregroundStyle(palette.star)
                 Text(text)
-                    .font(.system(.subheadline, design: .rounded).weight(.semibold))
+                    .font(LumenoteFont.subheadline(.semibold))
                     .foregroundStyle(.primary)
                     .multilineTextAlignment(.leading)
                 Spacer(minLength: 0)
             }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 6)
+            .padding(.horizontal, LumenoteSpacing.md)
+            .padding(.vertical, LumenoteSpacing.sm)
             .background(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                RoundedRectangle(cornerRadius: LumenoteRadius.softRow, style: .continuous)
                     .fill(palette.highlightSoft)
             )
         }
@@ -317,11 +277,11 @@ struct CircleOfFifthsView: View {
     private var scaleNotesTable: some View {
         VStack(alignment: .leading, spacing: 0) {
             Text("Scale")
-                .font(.system(.caption, design: .rounded).weight(.bold))
+                .font(LumenoteFont.caption(.bold))
                 .foregroundStyle(.secondary)
-                .padding(.horizontal, 14)
-                .padding(.top, 12)
-                .padding(.bottom, 10)
+                .padding(.horizontal, LumenoteSpacing.xxl)
+                .padding(.top, LumenoteSpacing.xl)
+                .padding(.bottom, LumenoteSpacing.lg)
 
             HStack(spacing: 0) {
                 ForEach(Array(model.scaleTones.enumerated()), id: \.element.id) { index, tone in
@@ -329,39 +289,36 @@ struct CircleOfFifthsView: View {
                         Rectangle()
                             .fill(palette.divider)
                             .frame(width: 1)
-                            .padding(.vertical, 4)
+                            .padding(.vertical, LumenoteSpacing.xs)
                     }
 
                     let isLit = model.emphasizedScaleDegrees.contains(tone.scaleDegree)
 
-                    VStack(spacing: 6) {
+                    VStack(spacing: LumenoteSpacing.sm) {
                         Text(tone.degree)
-                            .font(.system(.caption2, design: .rounded).weight(.semibold))
+                            .font(LumenoteFont.caption2(.semibold))
                             .foregroundStyle(isLit ? Color.primary : .secondary)
                         Text(tone.note)
-                            .font(.system(.body, design: .rounded).weight(index == 0 || isLit ? .bold : .semibold))
+                            .font(LumenoteFont.body(index == 0 || isLit ? .bold : .semibold))
                             .foregroundStyle(.primary)
                             .minimumScaleFactor(0.7)
                             .lineLimit(1)
                     }
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 4)
+                    .padding(.vertical, LumenoteSpacing.xs)
                     .background(
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .fill(isLit ? palette.highlight : Color.clear)
+                        HighlightChipBackground(
+                            isLit: isLit,
+                            cornerRadius: LumenoteRadius.scaleCell
+                        )
                     )
                 }
             }
-            .padding(.horizontal, 10)
-            .padding(.bottom, 12)
+            .padding(.horizontal, LumenoteSpacing.lg)
+            .padding(.bottom, LumenoteSpacing.xl)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(palette.cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(palette.cardBorder, lineWidth: 1.5)
-        )
+        .lumenoteCard()
         .accessibilityElement(children: .contain)
         .accessibilityLabel("스케일 구성음")
     }
@@ -373,37 +330,29 @@ struct CircleOfFifthsView: View {
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 4) {
+            VStack(alignment: .leading, spacing: LumenoteSpacing.xs) {
+                HStack(spacing: LumenoteSpacing.xs) {
                     Text(title)
-                        .font(.system(.caption, design: .rounded).weight(.bold))
+                        .font(LumenoteFont.caption(.bold))
                         .foregroundStyle(.secondary)
                     Spacer(minLength: 0)
                     Image(systemName: "chevron.down")
-                        .font(.system(size: 11, weight: .bold))
+                        .font(LumenoteFont.rounded(size: 11, weight: .bold))
                         .foregroundStyle(.secondary)
                         .rotationEffect(.degrees(isActive ? 180 : 0))
                 }
 
                 Text(value)
-                    .font(.system(.body, design: .rounded).weight(.semibold))
+                    .font(LumenoteFont.body(.semibold))
                     .foregroundStyle(.primary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
+            .padding(.horizontal, LumenoteSpacing.xxl)
+            .padding(.vertical, LumenoteSpacing.xl)
             .frame(maxWidth: .infinity, minHeight: 64, alignment: .leading)
-            .background(palette.cardBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .strokeBorder(
-                        isActive ? palette.cardBorderActive : palette.cardBorder,
-                        lineWidth: isActive ? 2.5 : 1.5
-                    )
-            )
+            .lumenoteCard(isActive: isActive)
         }
         .buttonStyle(.plain)
     }
@@ -430,19 +379,19 @@ struct CircleOfFifthsView: View {
             VStack(spacing: 0) {
                 HStack {
                     Text(picker.title)
-                        .font(.system(.headline, design: .rounded).weight(.bold))
+                        .font(LumenoteFont.headline(.bold))
                     Spacer()
                     Button(action: dismissPicker) {
                         Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 22))
+                            .font(LumenoteFont.rounded(size: 22, weight: .regular))
                             .symbolRenderingMode(.hierarchical)
                             .foregroundStyle(.secondary)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("닫기")
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 14)
+                .padding(.horizontal, LumenoteSpacing.xxxl)
+                .padding(.vertical, LumenoteSpacing.xxl)
                 .background(palette.popupHeaderBackground)
                 .foregroundStyle(palette.popupHeaderForeground)
 
@@ -452,14 +401,8 @@ struct CircleOfFifthsView: View {
             // Fixed popup height prevents the card (and surrounding layout) from resizing
             // as the list content or selection changes.
             .frame(height: 420)
-            .background(palette.popupBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .strokeBorder(palette.cardBorder, lineWidth: 2)
-            )
-            .shadow(color: .black.opacity(0.18), radius: 18, y: 8)
-            .padding(.horizontal, 28)
+            .lumenotePopup()
+            .padding(.horizontal, LumenoteSpacing.popupInset)
         }
     }
 
@@ -508,25 +451,25 @@ struct CircleOfFifthsView: View {
                             row.action()
                         } label: {
                             HStack {
-                                VStack(alignment: .leading, spacing: 2) {
+                                VStack(alignment: .leading, spacing: LumenoteSpacing.xxs) {
                                     Text(row.label)
-                                        .font(.system(.body, design: .rounded).weight(.semibold))
+                                        .font(LumenoteFont.body(.semibold))
                                         .foregroundStyle(.primary)
                                     if let subtitle = row.subtitle {
                                         Text(subtitle)
-                                            .font(.system(.caption, design: .rounded).weight(.medium))
+                                            .font(LumenoteFont.caption(.medium))
                                             .foregroundStyle(.secondary)
                                     }
                                 }
                                 Spacer(minLength: 0)
                                 if row.isSelected {
                                     Image(systemName: "checkmark")
-                                        .font(.system(size: 14, weight: .bold))
+                                        .font(LumenoteFont.rounded(size: 14, weight: .bold))
                                         .foregroundStyle(.primary)
                                 }
                             }
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 12)
+                            .padding(.horizontal, LumenoteSpacing.xxxl)
+                            .padding(.vertical, LumenoteSpacing.xl)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .background(rowBackground(row))
                         }
@@ -587,4 +530,5 @@ private struct SelectionRow: Identifiable {
 
 #Preview {
     CircleOfFifthsView()
+        .lumenotePalette()
 }
