@@ -2,26 +2,9 @@
 
 import SwiftUI
 
-/// Appearance chosen by the user. `.system` follows the device setting.
-enum AppearanceMode: String, CaseIterable {
-    case system
-    case light
-    case dark
-
-    static let storageKey = "appearanceMode"
-
-    var colorScheme: ColorScheme? {
-        switch self {
-        case .system: return nil
-        case .light: return .light
-        case .dark: return .dark
-        }
-    }
-}
-
 /// Colors for the app chrome, resolved for the active color scheme.
-/// Views build one from `@Environment(\.colorScheme)` instead of hardcoding shades,
-/// so light and dark can diverge where a single value would be unreadable.
+/// Views read this from `@Environment(\.appPalette)` so light and dark can diverge
+/// where a single value would be unreadable.
 struct AppPalette {
     let colorScheme: ColorScheme
 
@@ -134,5 +117,38 @@ struct AppPalette {
     /// Background of a rarely used tonic row in the picker.
     var obscureRow: Color {
         isDark ? Color(white: 0.22) : Color(white: 0.91)
+    }
+
+    /// Drop-shadow opacity for the raised tonic wedge.
+    var raisedWedgeShadowOpacity: Double {
+        isDark ? 0.45 : 0.2
+    }
+}
+
+// MARK: - Environment
+
+private struct AppPaletteKey: EnvironmentKey {
+    static let defaultValue = AppPalette(colorScheme: .light)
+}
+
+extension EnvironmentValues {
+    var appPalette: AppPalette {
+        get { self[AppPaletteKey.self] }
+        set { self[AppPaletteKey.self] = newValue }
+    }
+}
+
+extension View {
+    /// Resolves `AppPalette` from the current color scheme and injects it for descendants.
+    func lumenotePalette() -> some View {
+        modifier(LumenotePaletteModifier())
+    }
+}
+
+private struct LumenotePaletteModifier: ViewModifier {
+    @Environment(\.colorScheme) private var colorScheme
+
+    func body(content: Content) -> some View {
+        content.environment(\.appPalette, AppPalette(colorScheme: colorScheme))
     }
 }
