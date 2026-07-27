@@ -3,9 +3,14 @@
 import SwiftUI
 
 struct CircleOfFifthsView: View {
+    @Environment(\.colorScheme) private var colorScheme
+    @AppStorage(AppearanceMode.storageKey) private var appearance: AppearanceMode = .system
+
     @State private var model = CircleOfFifthsModel()
     @State private var activePicker: ActivePicker?
     @State private var emphasisClearToken = UUID()
+
+    private var palette: AppPalette { AppPalette(colorScheme: colorScheme) }
 
     private enum ActivePicker: Identifiable, Equatable {
         case tonic
@@ -35,7 +40,13 @@ struct CircleOfFifthsView: View {
                     HStack(alignment: .top, spacing: 20) {
                         circleSection
                         ScrollView {
-                            selectors(stacked: true)
+                            VStack(spacing: 12) {
+                                HStack {
+                                    Spacer(minLength: 0)
+                                    appearanceToggle
+                                }
+                                selectors(stacked: true)
+                            }
                         }
                         .scrollIndicators(.hidden)
                         .frame(width: min(280, geo.size.width * 0.32))
@@ -48,6 +59,10 @@ struct CircleOfFifthsView: View {
                         }
                     }
                     .scrollIndicators(.hidden)
+                    // Sits in the empty corner beside the circle, so it costs no layout height.
+                    .overlay(alignment: .topTrailing) {
+                        appearanceToggle
+                    }
                 }
             }
             .padding(16)
@@ -66,14 +81,27 @@ struct CircleOfFifthsView: View {
 
     private var background: some View {
         LinearGradient(
-            colors: [
-                Color(red: 0.97, green: 0.96, blue: 0.93),
-                Color(red: 0.92, green: 0.94, blue: 0.96)
-            ],
+            colors: palette.backgroundColors,
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )
         .ignoresSafeArea()
+    }
+
+    private var appearanceToggle: some View {
+        let isDark = colorScheme == .dark
+        return Button {
+            appearance = isDark ? .light : .dark
+        } label: {
+            Image(systemName: isDark ? "sun.max.fill" : "moon.fill")
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(.primary)
+                .frame(width: 34, height: 34)
+                .background(Circle().fill(palette.cardBackground))
+                .overlay(Circle().strokeBorder(palette.cardBorder, lineWidth: 1.2))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(isDark ? "라이트 모드로 전환" : "다크 모드로 전환")
     }
 
     private var circleSection: some View {
@@ -88,10 +116,10 @@ struct CircleOfFifthsView: View {
 
     private var legend: some View {
         HStack(spacing: 14) {
-            legendItem(color: Color(red: 0xE9 / 255, green: 0x5D / 255, blue: 0x5D / 255), title: "Major")
-            legendItem(color: Color(red: 0x4F / 255, green: 0x81 / 255, blue: 0xEE / 255), title: "Minor")
-            legendItem(color: Color(red: 0x9A / 255, green: 0x64 / 255, blue: 0xDB / 255), title: "Dim")
-            legendItem(color: Color(red: 0.86, green: 0.86, blue: 0.86), title: "Non-diatonic")
+            legendItem(color: palette.major, title: "Major")
+            legendItem(color: palette.minor, title: "Minor")
+            legendItem(color: palette.diminished, title: "Dim")
+            legendItem(color: palette.chromaticFill, title: "Non-diatonic")
         }
         .font(.system(.caption2, design: .rounded).weight(.semibold))
     }
@@ -197,7 +225,7 @@ struct CircleOfFifthsView: View {
                                 .padding(.vertical, 4)
                                 .background(
                                     RoundedRectangle(cornerRadius: 5, style: .continuous)
-                                        .fill(isLit ? Color(red: 1.0, green: 0.88, blue: 0.65) : Color.clear)
+                                        .fill(isLit ? palette.highlight : Color.clear)
                                 )
                         }
                         .buttonStyle(.plain)
@@ -230,11 +258,11 @@ struct CircleOfFifthsView: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.white.opacity(0.85))
+        .background(palette.cardBackground)
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(Color.black.opacity(0.75), lineWidth: 1.5)
+                .strokeBorder(palette.cardBorder, lineWidth: 1.5)
         )
         .accessibilityElement(children: .contain)
         .accessibilityLabel("모드 캐릭터, \(character.summary)")
@@ -249,7 +277,7 @@ struct CircleOfFifthsView: View {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
                 Text(symbol)
                     .font(.system(.subheadline, design: .rounded).weight(.bold))
-                    .foregroundStyle(Color(red: 0.85, green: 0.55, blue: 0.1))
+                    .foregroundStyle(palette.star)
                 Text(text)
                     .font(.system(.subheadline, design: .rounded).weight(.semibold))
                     .foregroundStyle(.primary)
@@ -260,7 +288,7 @@ struct CircleOfFifthsView: View {
             .padding(.vertical, 6)
             .background(
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(Color(red: 1.0, green: 0.95, blue: 0.86))
+                    .fill(palette.highlightSoft)
             )
         }
         .buttonStyle(.plain)
@@ -299,7 +327,7 @@ struct CircleOfFifthsView: View {
                 ForEach(Array(model.scaleTones.enumerated()), id: \.element.id) { index, tone in
                     if index > 0 {
                         Rectangle()
-                            .fill(Color.black.opacity(0.08))
+                            .fill(palette.divider)
                             .frame(width: 1)
                             .padding(.vertical, 4)
                     }
@@ -320,7 +348,7 @@ struct CircleOfFifthsView: View {
                     .padding(.vertical, 4)
                     .background(
                         RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .fill(isLit ? Color(red: 1.0, green: 0.88, blue: 0.65) : Color.clear)
+                            .fill(isLit ? palette.highlight : Color.clear)
                     )
                 }
             }
@@ -328,11 +356,11 @@ struct CircleOfFifthsView: View {
             .padding(.bottom, 12)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.white.opacity(0.85))
+        .background(palette.cardBackground)
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(Color.black.opacity(0.75), lineWidth: 1.5)
+                .strokeBorder(palette.cardBorder, lineWidth: 1.5)
         )
         .accessibilityElement(children: .contain)
         .accessibilityLabel("스케일 구성음")
@@ -367,12 +395,12 @@ struct CircleOfFifthsView: View {
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
             .frame(maxWidth: .infinity, minHeight: 64, alignment: .leading)
-            .background(Color.white.opacity(0.85))
+            .background(palette.cardBackground)
             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .strokeBorder(
-                        isActive ? Color.black : Color.black.opacity(0.75),
+                        isActive ? palette.cardBorderActive : palette.cardBorder,
                         lineWidth: isActive ? 2.5 : 1.5
                     )
             )
@@ -395,7 +423,7 @@ struct CircleOfFifthsView: View {
     @ViewBuilder
     private func selectionPopup(for picker: ActivePicker) -> some View {
         ZStack {
-            Color.black.opacity(0.28)
+            palette.scrim
                 .ignoresSafeArea()
                 .onTapGesture(perform: dismissPicker)
 
@@ -415,8 +443,8 @@ struct CircleOfFifthsView: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.vertical, 14)
-                .background(Color.black)
-                .foregroundStyle(.white)
+                .background(palette.popupHeaderBackground)
+                .foregroundStyle(palette.popupHeaderForeground)
 
                 popupList(for: picker)
             }
@@ -424,11 +452,11 @@ struct CircleOfFifthsView: View {
             // Fixed popup height prevents the card (and surrounding layout) from resizing
             // as the list content or selection changes.
             .frame(height: 420)
-            .background(Color.white)
+            .background(palette.popupBackground)
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(Color.black.opacity(0.85), lineWidth: 2)
+                    .strokeBorder(palette.cardBorder, lineWidth: 2)
             )
             .shadow(color: .black.opacity(0.18), radius: 18, y: 8)
             .padding(.horizontal, 28)
@@ -539,12 +567,12 @@ struct CircleOfFifthsView: View {
 
     private func rowBackground(_ row: SelectionRow) -> Color {
         if row.isSelected {
-            return Color(red: 1.0, green: 0.88, blue: 0.65)
+            return palette.highlight
         }
         if row.isObscure {
-            return Color(red: 0.91, green: 0.91, blue: 0.91)
+            return palette.obscureRow
         }
-        return Color.white
+        return palette.popupBackground
     }
 }
 
