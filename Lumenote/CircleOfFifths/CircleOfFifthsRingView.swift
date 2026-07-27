@@ -5,17 +5,17 @@ import SwiftUI
 struct CircleOfFifthsRingView: View {
     @Bindable var model: CircleOfFifthsModel
 
+    @Environment(\.colorScheme) private var colorScheme
+
     @State private var ringRotationDegrees: Double = 0
     @State private var dragRotationDegrees: Double = 0
     @State private var dragStartAngle: Double?
     @State private var rotationAtDragStart: Double = 0
 
-    private let majorColor = Color(red: 0xE9 / 255, green: 0x5D / 255, blue: 0x5D / 255)
-    private let minorColor = Color(red: 0x4F / 255, green: 0x81 / 255, blue: 0xEE / 255)
-    private let diminishedColor = Color(red: 0x9A / 255, green: 0x64 / 255, blue: 0xDB / 255)
-    private let chromaticFill = Color(red: 0.86, green: 0.86, blue: 0.86)
-    private let relativeFill = Color(red: 0.94, green: 0.94, blue: 0.95)
-    private let ringStroke = Color(red: 0.15, green: 0.15, blue: 0.15)
+    private var palette: AppPalette { AppPalette(colorScheme: colorScheme) }
+    private var chromaticFill: Color { palette.chromaticFill }
+    private var relativeFill: Color { palette.relativeFill }
+    private var ringStroke: Color { palette.ringStroke }
 
     /// Base outer radius of the degree ring (outermost).
     private let outerRadiusRatio: CGFloat = 0.48
@@ -68,7 +68,10 @@ struct CircleOfFifthsRingView: View {
                         angularPadDegrees: raisedAngularPadDegrees,
                         isEmphasized: model.emphasizedClockPositions.contains { position in
                             model.screenClock(forModelPosition: position) == 12
-                        }
+                        },
+                        emphasisFill: palette.emphasisFill,
+                        emphasisStroke: palette.emphasisStroke,
+                        shadowOpacity: colorScheme == .dark ? 0.45 : 0.2
                     )
 
                     // Rotating labels.
@@ -188,8 +191,8 @@ struct CircleOfFifthsRingView: View {
         let emphasizedScreens = Set(
             model.emphasizedClockPositions.map { model.screenClock(forModelPosition: $0) }
         )
-        let emphasisFill = Color(red: 1.0, green: 0.82, blue: 0.28).opacity(0.42)
-        let emphasisStroke = Color(red: 0.92, green: 0.55, blue: 0.08)
+        let emphasisFill = palette.emphasisFill
+        let emphasisStroke = palette.emphasisStroke
         let emphasisLineWidth: CGFloat = 2.4
         // The stroke is centered on the path, so inset the outline by half the line
         // width (radially and angularly) to keep the border fully inside the cell.
@@ -240,7 +243,7 @@ struct CircleOfFifthsRingView: View {
                 .padding(isEmphasized ? 3 : 0)
                 .background(
                     Circle()
-                        .fill(isEmphasized ? Color(red: 1.0, green: 0.82, blue: 0.28).opacity(0.9) : .clear)
+                        .fill(isEmphasized ? palette.emphasisStroke.opacity(0.9) : .clear)
                 )
                 .rotationEffect(.degrees(-displayedRotationDegrees))
                 .position(point(center: center, radius: radius, angle: angleForCenter(of: position)))
@@ -497,9 +500,9 @@ struct CircleOfFifthsRingView: View {
     private func noteColor(forScreenClock position: Int) -> Color {
         if let quality = model.screenChordQuality(atScreenClock: position) {
             switch quality {
-            case .major: return majorColor
-            case .minor: return minorColor
-            case .diminished: return diminishedColor
+            case .major: return palette.major
+            case .minor: return palette.minor
+            case .diminished: return palette.diminished
             }
         }
         return chromaticFill
@@ -577,6 +580,10 @@ private struct RaisedTonicWedgeView: View {
     let raisedScale: CGFloat
     let angularPadDegrees: Double
     var isEmphasized: Bool = false
+    var emphasisFill: Color = .clear
+    var emphasisStroke: Color = .clear
+    /// Contact shadow needs more weight on a dark background to still read as raised.
+    var shadowOpacity: Double = 0.2
 
     var body: some View {
         GeometryReader { geo in
@@ -589,7 +596,7 @@ private struct RaisedTonicWedgeView: View {
                     outerRatio: outerRadiusRatio * raisedScale,
                     angularPadDegrees: angularPadDegrees
                 )
-                .fill(Color.black.opacity(0.2))
+                .fill(Color.black.opacity(shadowOpacity))
                 .offset(y: size * 0.01)
                 .blur(radius: size * 0.014)
 
@@ -628,7 +635,7 @@ private struct RaisedTonicWedgeView: View {
                         outerRatio: outerRadiusRatio * raisedScale,
                         angularPadDegrees: angularPadDegrees
                     )
-                    .fill(Color(red: 1.0, green: 0.82, blue: 0.28).opacity(0.42))
+                    .fill(emphasisFill)
                     .overlay(
                         AnnularSector(
                             clockPosition: 12,
@@ -636,7 +643,7 @@ private struct RaisedTonicWedgeView: View {
                             outerRatio: outerRadiusRatio * raisedScale - insetRatio,
                             angularPadDegrees: angularPadDegrees - angularInsetDegrees
                         )
-                        .stroke(Color(red: 0.92, green: 0.55, blue: 0.08), lineWidth: emphasisLineWidth)
+                        .stroke(emphasisStroke, lineWidth: emphasisLineWidth)
                     )
                 }
             }
