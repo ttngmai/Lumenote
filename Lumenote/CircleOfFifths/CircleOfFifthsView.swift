@@ -35,26 +35,30 @@ struct CircleOfFifthsView: View {
 
             Group {
                 if isWide {
-                    HStack(alignment: .top, spacing: LumenoteSpacing.section) {
-                        circleSection
+                    HStack(alignment: .center, spacing: LumenoteSpacing.xl) {
+                        circleSection(placesLegendBeside: true)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+
                         ScrollView {
                             selectors(stacked: true)
                         }
                         .scrollIndicators(.hidden)
-                        .frame(width: min(280, geo.size.width * 0.32))
+                        .frame(width: min(260, geo.size.width * 0.28))
                     }
                 } else {
                     ScrollView {
                         VStack(spacing: LumenoteSpacing.xxxl) {
-                            circleSection
+                            circleSection(placesLegendBeside: false)
                             selectors(stacked: false)
                         }
                     }
                     .scrollIndicators(.hidden)
                 }
             }
-            .padding(LumenoteSpacing.xxxl)
-            .frame(width: geo.size.width, height: geo.size.height, alignment: .top)
+            .padding(.horizontal, isWide ? LumenoteSpacing.lg : LumenoteSpacing.xxxl)
+            .padding(.top, isWide ? LumenoteSpacing.lg : LumenoteSpacing.xxxl)
+            .padding(.bottom, isWide ? 0 : LumenoteSpacing.xxxl)
+            .frame(width: geo.size.width, height: geo.size.height, alignment: isWide ? .center : .top)
         }
         .background(background)
         .toolbar {
@@ -81,24 +85,11 @@ struct CircleOfFifthsView: View {
         .ignoresSafeArea()
     }
 
-    private var circleSection: some View {
-        VStack(spacing: LumenoteSpacing.xxs) {
-            CircleOfFifthsRingView(model: model)
-                .frame(maxWidth: 520)
-                .padding(.horizontal, LumenoteSpacing.xs)
-
-            legend
-        }
-    }
-
-    private var legend: some View {
-        HStack(spacing: LumenoteSpacing.xxl) {
-            LegendSwatch(color: palette.major, title: "Major")
-            LegendSwatch(color: palette.minor, title: "Minor")
-            LegendSwatch(color: palette.diminished, title: "Dim")
-            LegendSwatch(color: palette.chromaticFill, title: "Non-diatonic")
-        }
-        .font(LumenoteFont.caption2(.semibold))
+    private func circleSection(placesLegendBeside: Bool) -> some View {
+        CircleOfFifthsRingView(model: model, placesLegendBeside: placesLegendBeside)
+            // Portrait keeps a readable cap; landscape uses the full leftover column.
+            .frame(maxWidth: placesLegendBeside ? .infinity : 520)
+            .padding(.horizontal, placesLegendBeside ? 0 : LumenoteSpacing.xs)
     }
 
     @ViewBuilder
@@ -164,7 +155,7 @@ struct CircleOfFifthsView: View {
 
             VStack(alignment: .leading, spacing: LumenoteSpacing.sm) {
                 Text("Formula")
-                    .font(LumenoteFont.caption2(.semibold))
+                    .font(LumenoteFont.caption(.bold))
                     .foregroundStyle(.secondary)
 
                 HStack(spacing: LumenoteSpacing.xxs) {
