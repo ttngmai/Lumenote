@@ -188,7 +188,7 @@ gh pr create --draft --base main
 - 기존 PR close
 - 실패한 테스트를 숨기거나 생략
 
-8. 최종 보고
+# 8. 최종 보고
 
 작업이 끝나면 다음을 보고한다.
 
