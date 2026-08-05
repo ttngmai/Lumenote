@@ -61,10 +61,8 @@ struct CircleOfFifthsView: View {
             .frame(width: geo.size.width, height: geo.size.height, alignment: isWide ? .center : .top)
         }
         .background(background)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                AppearanceToggleButton(appearance: $appearance)
-            }
+        .lumenoteCompactHeader(title: "5도권", showsBackButton: true) {
+            AppearanceToggleButton(appearance: $appearance)
         }
         // Overlay sits above the whole screen so opening it never reflows the circle layout.
         .overlay {

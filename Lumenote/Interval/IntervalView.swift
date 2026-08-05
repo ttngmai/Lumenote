@@ -32,10 +32,8 @@ struct IntervalView: View {
         }
         .scrollIndicators(.hidden)
         .background(background)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                AppearanceToggleButton(appearance: $appearance)
-            }
+        .lumenoteCompactHeader(title: "음정", showsBackButton: true) {
+            AppearanceToggleButton(appearance: $appearance)
         }
         .overlay {
             if showRootPicker {
@@ -309,7 +307,6 @@ struct IntervalView: View {
 #Preview {
     NavigationStack {
         IntervalView()
-            .navigationTitle("음정")
     }
     .lumenotePalette()
 }

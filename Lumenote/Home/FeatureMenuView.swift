@@ -33,23 +33,15 @@ struct FeatureMenuView: View {
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
         .background(background)
-        .navigationTitle("Lumenote")
-        .navigationBarTitleDisplayMode(.large)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                AppearanceToggleButton(appearance: $appearance)
-            }
+        .lumenoteCompactHeader(title: "Lumenote") {
+            AppearanceToggleButton(appearance: $appearance)
         }
         .navigationDestination(for: Destination.self) { destination in
             switch destination {
             case .circleOfFifths:
                 CircleOfFifthsView()
-                    .navigationTitle("5도권")
-                    .navigationBarTitleDisplayMode(.inline)
             case .interval:
                 IntervalView()
-                    .navigationTitle("음정")
-                    .navigationBarTitleDisplayMode(.inline)
             }
         }
     }
