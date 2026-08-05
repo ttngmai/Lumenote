@@ -38,13 +38,7 @@ struct CircleOfFifthsView: View {
                     HStack(alignment: .top, spacing: LumenoteSpacing.section) {
                         circleSection
                         ScrollView {
-                            VStack(spacing: LumenoteSpacing.xl) {
-                                HStack {
-                                    Spacer(minLength: 0)
-                                    AppearanceToggleButton(appearance: $appearance)
-                                }
-                                selectors(stacked: true)
-                            }
+                            selectors(stacked: true)
                         }
                         .scrollIndicators(.hidden)
                         .frame(width: min(280, geo.size.width * 0.32))
@@ -57,16 +51,17 @@ struct CircleOfFifthsView: View {
                         }
                     }
                     .scrollIndicators(.hidden)
-                    // Sits in the empty corner beside the circle, so it costs no layout height.
-                    .overlay(alignment: .topTrailing) {
-                        AppearanceToggleButton(appearance: $appearance)
-                    }
                 }
             }
             .padding(LumenoteSpacing.xxxl)
             .frame(width: geo.size.width, height: geo.size.height, alignment: .top)
         }
         .background(background)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                AppearanceToggleButton(appearance: $appearance)
+            }
+        }
         // Overlay sits above the whole screen so opening it never reflows the circle layout.
         .overlay {
             if let activePicker {
