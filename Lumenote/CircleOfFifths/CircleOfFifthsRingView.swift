@@ -4,6 +4,8 @@ import SwiftUI
 
 struct CircleOfFifthsRingView: View {
     @Bindable var model: CircleOfFifthsModel
+    /// When true, color legend sits to the left of the ring (landscape / wide layouts).
+    var placesLegendBeside: Bool = false
 
     @Environment(\.appPalette) private var palette
 
@@ -27,8 +29,16 @@ struct CircleOfFifthsRingView: View {
     private let raisedScale: CGFloat = 1.05
     private let raisedAngularPadDegrees: Double = 2.5
     /// Extra vertical room (as a fraction of ring size) for raised tonic + “완전4/5도” labels.
-    /// Keeps ring diameter unchanged while preventing ScrollView from clipping overflow.
-    private let verticalLabelMarginRatio: CGFloat = 0.08
+    /// Portrait keeps a generous symmetric margin for ScrollView clipping.
+    /// Landscape only reserves the top — affordance labels sit on the upper arc, and bottom gap
+    /// just wastes scarce height.
+    private var topLabelMarginRatio: CGFloat {
+        placesLegendBeside ? 0.055 : 0.08
+    }
+
+    private var bottomLabelMarginRatio: CGFloat {
+        placesLegendBeside ? 0 : 0.08
+    }
 
     /// Continuous ring rotation. Avoids C (0°) ↔ F (−330°) long-way animation.
     private var displayedRotationDegrees: Double {
@@ -37,83 +47,175 @@ struct CircleOfFifthsRingView: View {
 
     /// Layout is slightly taller than wide so labels above/below the ring aren't clipped.
     private var layoutAspectRatio: CGFloat {
-        1 / (1 + verticalLabelMarginRatio * 2)
+        1 / (1 + topLabelMarginRatio + bottomLabelMarginRatio)
     }
 
     var body: some View {
+        Group {
+            if placesLegendBeside {
+                landscapeLegendAndRing
+            } else {
+                VStack(spacing: 0) {
+                    ringCanvas
+                    // Pull into the ring's bottom label margin so the swatches sit closer to the circle.
+                    legend(axis: .horizontal)
+                        .padding(.top, -LumenoteSpacing.section)
+                }
+            }
+        }
+    }
+
+    /// Legend + ring as one compact group, centered in the leftover landscape column.
+    private var landscapeLegendAndRing: some View {
         GeometryReader { geo in
-            // Use width as the ring size (same diameter as the old 1:1 square layout).
-            let size = geo.size.width
-            let localCenter = CGPoint(x: size / 2, y: size / 2)
-            let gestureCenter = CGPoint(x: geo.size.width / 2, y: geo.size.height / 2)
+            let gap = LumenoteSpacing.xs
+            // "Non-diatonic" caption column; keeps the ring from stealing legend width.
+            let legendReserve: CGFloat = 110
+            let size = ringDiameter(
+                in: CGSize(
+                    width: max(geo.size.width - legendReserve - gap, 1),
+                    height: geo.size.height
+                )
+            )
 
             ZStack {
-                ZStack {
-                    // Base rings (equal wedges).
-                    Canvas { context, _ in
-                        drawBaseRings(context: context, center: localCenter, size: size)
-                    }
-
-                    // Raised 12 o'clock wedge drawn above neighbors with a drop shadow.
-                    RaisedTonicWedgeView(
-                        noteColor: noteColor(forScreenClock: 12),
-                        relativeFill: relativeFill,
-                        ringStroke: ringStroke,
-                        outerRadiusRatio: outerRadiusRatio,
-                        noteOuterRatio: noteOuterRatio,
-                        noteInnerRatio: noteInnerRatio,
-                        relativeInnerRatio: relativeInnerRatio,
-                        raisedScale: raisedScale,
-                        angularPadDegrees: raisedAngularPadDegrees,
-                        isEmphasized: model.emphasizedClockPositions.contains { position in
-                            model.screenClock(forModelPosition: position) == 12
-                        },
-                        emphasisFill: palette.emphasisFill,
-                        emphasisStroke: palette.emphasisStroke,
-                        shadowOpacity: palette.raisedWedgeShadowOpacity
-                    )
-
-                    // Rotating labels.
-                    ZStack {
-                        noteLabels(center: localCenter, size: size)
-                        relativeMinorLabels(center: localCenter, size: size)
-                    }
-                    .rotationEffect(.degrees(displayedRotationDegrees))
-
-                    // Degree numerals stay fixed on screen (aligned to the pinned tonic wedges).
-                    degreeLabels(center: localCenter, size: size)
-
-                    centerHub(size: size)
-                    rotationAffordances(center: localCenter, size: size)
+                HStack(alignment: .center, spacing: gap) {
+                    legend(axis: .vertical)
+                    ringSquare(size: size)
+                        // Taller frame reserves top label room; ring sits on the bottom edge.
+                        .frame(
+                            width: size,
+                            height: size + size * topLabelMarginRatio,
+                            alignment: .bottom
+                        )
                 }
-                .frame(width: size, height: size)
             }
             .frame(width: geo.size.width, height: geo.size.height)
-            .animation(.easeInOut(duration: 0.2), value: model.emphasizedClockPositions)
-            .contentShape(Circle().scale(1.12))
-            .gesture(rotationDragGesture(center: gestureCenter))
-            .onAppear {
-                ringRotationDegrees = canonicalRotationDegrees(for: model.tonicArrowPosition)
-            }
-            .onChange(of: model.selectedTonic) { _, _ in
-                // Picker / external tonic changes: take the shortest arc (fixes C ↔ F spin).
-                guard dragStartAngle == nil else { return }
-                withAnimation(.spring(response: 0.45, dampingFraction: 0.82)) {
-                    ringRotationDegrees += shortestRotationDelta(
-                        from: ringRotationDegrees,
-                        to: canonicalRotationDegrees(for: model.tonicArrowPosition)
-                    )
-                }
-            }
-            .animation(
-                dragStartAngle == nil
-                    ? .spring(response: 0.45, dampingFraction: 0.82)
-                    : nil,
-                value: model.selectedMode
-            )
         }
-        .aspectRatio(layoutAspectRatio, contentMode: .fit)
+    }
+
+    @ViewBuilder
+    private var ringCanvas: some View {
+        ringGeometry
+            .aspectRatio(layoutAspectRatio, contentMode: .fit)
+    }
+
+    private var ringGeometry: some View {
+        GeometryReader { geo in
+            let size = ringDiameter(in: geo.size)
+            let ringOriginX = (geo.size.width - size) / 2
+            let ringOriginY = (geo.size.height - size) / 2
+
+            ringSquare(size: size)
+                .frame(width: size, height: size)
+                .position(x: ringOriginX + size / 2, y: ringOriginY + size / 2)
+                .frame(width: geo.size.width, height: geo.size.height)
+        }
         .accessibilityHint("원을 드래그하여 토닉을 변경합니다. 시계 방향은 완전5도, 반시계 방향은 완전4도입니다.")
+    }
+
+    /// Fixed-size ring (drawing + gesture). Used by both portrait and landscape layouts.
+    private func ringSquare(size: CGFloat) -> some View {
+        let localCenter = CGPoint(x: size / 2, y: size / 2)
+
+        return ZStack {
+            // Base rings (equal wedges).
+            Canvas { context, _ in
+                drawBaseRings(context: context, center: localCenter, size: size)
+            }
+
+            // Raised 12 o'clock wedge drawn above neighbors with a drop shadow.
+            RaisedTonicWedgeView(
+                noteColor: noteColor(forScreenClock: 12),
+                relativeFill: relativeFill,
+                ringStroke: ringStroke,
+                outerRadiusRatio: outerRadiusRatio,
+                noteOuterRatio: noteOuterRatio,
+                noteInnerRatio: noteInnerRatio,
+                relativeInnerRatio: relativeInnerRatio,
+                raisedScale: raisedScale,
+                angularPadDegrees: raisedAngularPadDegrees,
+                isEmphasized: model.emphasizedClockPositions.contains { position in
+                    model.screenClock(forModelPosition: position) == 12
+                },
+                emphasisFill: palette.emphasisFill,
+                emphasisStroke: palette.emphasisStroke,
+                shadowOpacity: palette.raisedWedgeShadowOpacity
+            )
+
+            // Rotating labels.
+            ZStack {
+                noteLabels(center: localCenter, size: size)
+                relativeMinorLabels(center: localCenter, size: size)
+            }
+            .rotationEffect(.degrees(displayedRotationDegrees))
+
+            // Degree numerals stay fixed on screen (aligned to the pinned tonic wedges).
+            degreeLabels(center: localCenter, size: size)
+
+            centerHub(size: size)
+            rotationAffordances(center: localCenter, size: size)
+        }
+        .frame(width: size, height: size)
+        .animation(.easeInOut(duration: 0.2), value: model.emphasizedClockPositions)
+        .contentShape(Circle().scale(1.12))
+        .gesture(rotationDragGesture(center: localCenter))
+        .onAppear {
+            ringRotationDegrees = canonicalRotationDegrees(for: model.tonicArrowPosition)
+        }
+        .onChange(of: model.selectedTonic) { _, _ in
+            // Picker / external tonic changes: take the shortest arc (fixes C ↔ F spin).
+            guard dragStartAngle == nil else { return }
+            withAnimation(.spring(response: 0.45, dampingFraction: 0.82)) {
+                ringRotationDegrees += shortestRotationDelta(
+                    from: ringRotationDegrees,
+                    to: canonicalRotationDegrees(for: model.tonicArrowPosition)
+                )
+            }
+        }
+        .animation(
+            dragStartAngle == nil
+                ? .spring(response: 0.45, dampingFraction: 0.82)
+                : nil,
+            value: model.selectedMode
+        )
+        .accessibilityHint("원을 드래그하여 토닉을 변경합니다. 시계 방향은 완전5도, 반시계 방향은 완전4도입니다.")
+    }
+
+    /// Diameter limited by width and by height after label margins.
+    private func ringDiameter(in size: CGSize) -> CGFloat {
+        let heightBudget = size.height / (1 + topLabelMarginRatio + bottomLabelMarginRatio)
+        return max(min(size.width, heightBudget), 1)
+    }
+
+    private enum LegendAxis {
+        case horizontal
+        case vertical
+    }
+
+    @ViewBuilder
+    private func legend(axis: LegendAxis) -> some View {
+        let swatches = Group {
+            LegendSwatch(color: palette.major, title: "Major")
+            LegendSwatch(color: palette.minor, title: "Minor")
+            LegendSwatch(color: palette.diminished, title: "Dim")
+            LegendSwatch(color: palette.chromaticFill, title: "Non-diatonic")
+        }
+
+        switch axis {
+        case .horizontal:
+            HStack(spacing: LumenoteSpacing.xxl) {
+                swatches
+            }
+            .font(LumenoteFont.caption2(.semibold))
+        case .vertical:
+            VStack(alignment: .leading, spacing: LumenoteSpacing.lg) {
+                swatches
+            }
+            .font(LumenoteFont.caption2(.semibold))
+            .fixedSize(horizontal: true, vertical: false)
+            .accessibilityElement(children: .contain)
+        }
     }
 
     // MARK: - Base rings
